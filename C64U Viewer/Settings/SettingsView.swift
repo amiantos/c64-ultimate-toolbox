@@ -56,6 +56,7 @@ struct SettingsView: View {
                         connection.isMuted = false
                     }
                 ), range: 0...1)
+                SliderRow(label: "Balance", value: $connection.balance, range: -1...1)
             }
 
             Section("Rendering") {

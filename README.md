@@ -8,7 +8,7 @@ More screenshots: [General Settings](screenshots/C64U%20Viewer%20Screenshot%201.
 
 ## Features
 
-- **Live video and audio** — Receives the C64U's UDP video and audio streams directly
+- **Live video and audio** — Receives the C64U's UDP video and audio streams directly, with balance control to correct stereo imbalance
 - **CRT shader effects** — Metal-based post-processing with scanlines, bloom, phosphor afterglow, shadow masks, barrel distortion, and vignette
 - **8 built-in presets** — Clean, Home CRT, P3 Amber, P1 Green, Crisp, Warm Glow, Old TV, Arcade
 - **Custom presets** — Save, modify, and delete your own CRT configurations

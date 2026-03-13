@@ -33,6 +33,12 @@ final class C64Connection {
             UserDefaults.standard.set(volume, forKey: "c64_volume")
         }
     }
+    var balance: Float = 0.0 {
+        didSet {
+            audioPlayer.balance = balance
+            UserDefaults.standard.set(balance, forKey: "c64_balance")
+        }
+    }
     var isMuted = false
 
     private(set) var framesPerSecond: Double = 0
@@ -74,9 +80,12 @@ final class C64Connection {
             hostname = saved
         }
 
-        // Restore saved volume
+        // Restore saved volume and balance
         if UserDefaults.standard.object(forKey: "c64_volume") != nil {
             volume = UserDefaults.standard.float(forKey: "c64_volume")
+        }
+        if UserDefaults.standard.object(forKey: "c64_balance") != nil {
+            balance = UserDefaults.standard.float(forKey: "c64_balance")
         }
 
         // Load settings from preset manager

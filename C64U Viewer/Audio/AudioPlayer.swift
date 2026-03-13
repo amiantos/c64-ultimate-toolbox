@@ -16,6 +16,10 @@ final class AudioPlayer: @unchecked Sendable {
         didSet { engine.mainMixerNode.outputVolume = volume }
     }
 
+    var balance: Float = 0.0 {
+        didSet { playerNode.pan = balance }
+    }
+
     init() {
         // 48kHz stereo 16-bit integer (close enough to PAL 47982.89 / NTSC 47940.34)
         format = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 48000, channels: 2, interleaved: true)!
