@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		44655BC82F5B50EE00777AC7 /* C64U Viewer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "C64U Viewer.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		44655BC82F5B50EE00777AC7 /* C64 Ultimate Toolbox.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "C64 Ultimate Toolbox.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -40,7 +40,7 @@
 		44655BC92F5B50EE00777AC7 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				44655BC82F5B50EE00777AC7 /* C64U Viewer.app */,
+				44655BC82F5B50EE00777AC7 /* C64 Ultimate Toolbox.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,9 +48,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		44655BC72F5B50EE00777AC7 /* C64U Viewer */ = {
+		44655BC72F5B50EE00777AC7 /* C64 Ultimate Toolbox */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 44655BD32F5B50EF00777AC7 /* Build configuration list for PBXNativeTarget "C64U Viewer" */;
+			buildConfigurationList = 44655BD32F5B50EF00777AC7 /* Build configuration list for PBXNativeTarget "C64 Ultimate Toolbox" */;
 			buildPhases = (
 				44655BC42F5B50EE00777AC7 /* Sources */,
 				44655BC52F5B50EE00777AC7 /* Frameworks */,
@@ -63,11 +63,11 @@
 			fileSystemSynchronizedGroups = (
 				44655BCA2F5B50EE00777AC7 /* C64U Viewer */,
 			);
-			name = "C64U Viewer";
+			name = "C64 Ultimate Toolbox";
 			packageProductDependencies = (
 			);
 			productName = "C64U Viewer";
-			productReference = 44655BC82F5B50EE00777AC7 /* C64U Viewer.app */;
+			productReference = 44655BC82F5B50EE00777AC7 /* C64 Ultimate Toolbox.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -85,7 +85,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 44655BC32F5B50EE00777AC7 /* Build configuration list for PBXProject "C64U Viewer" */;
+			buildConfigurationList = 44655BC32F5B50EE00777AC7 /* Build configuration list for PBXProject "C64 Ultimate Toolbox" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -99,7 +99,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				44655BC72F5B50EE00777AC7 /* C64U Viewer */,
+				44655BC72F5B50EE00777AC7 /* C64 Ultimate Toolbox */,
 			);
 		};
 /* End PBXProject section */
@@ -324,7 +324,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		44655BC32F5B50EE00777AC7 /* Build configuration list for PBXProject "C64U Viewer" */ = {
+		44655BC32F5B50EE00777AC7 /* Build configuration list for PBXProject "C64 Ultimate Toolbox" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				44655BD12F5B50EF00777AC7 /* Debug */,
@@ -333,7 +333,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		44655BD32F5B50EF00777AC7 /* Build configuration list for PBXNativeTarget "C64U Viewer" */ = {
+		44655BD32F5B50EF00777AC7 /* Build configuration list for PBXNativeTarget "C64 Ultimate Toolbox" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				44655BD42F5B50EF00777AC7 /* Debug */,

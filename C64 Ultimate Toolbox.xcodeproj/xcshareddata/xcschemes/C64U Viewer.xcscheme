@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "44655BC72F5B50EE00777AC7"
-               BuildableName = "C64U Viewer.app"
-               BlueprintName = "C64U Viewer"
-               ReferencedContainer = "container:C64U Viewer.xcodeproj">
+               BuildableName = "C64 Ultimate Toolbox.app"
+               BlueprintName = "C64 Ultimate Toolbox"
+               ReferencedContainer = "container:C64 Ultimate Toolbox.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,9 +45,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "44655BC72F5B50EE00777AC7"
-            BuildableName = "C64U Viewer.app"
-            BlueprintName = "C64U Viewer"
-            ReferencedContainer = "container:C64U Viewer.xcodeproj">
+            BuildableName = "C64 Ultimate Toolbox.app"
+            BlueprintName = "C64 Ultimate Toolbox"
+            ReferencedContainer = "container:C64 Ultimate Toolbox.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -62,9 +62,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "44655BC72F5B50EE00777AC7"
-            BuildableName = "C64U Viewer.app"
-            BlueprintName = "C64U Viewer"
-            ReferencedContainer = "container:C64U Viewer.xcodeproj">
+            BuildableName = "C64 Ultimate Toolbox.app"
+            BlueprintName = "C64 Ultimate Toolbox"
+            ReferencedContainer = "container:C64 Ultimate Toolbox.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
