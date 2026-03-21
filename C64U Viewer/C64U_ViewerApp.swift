@@ -72,25 +72,6 @@ struct C64U_ViewerApp: App {
                 .disabled(!connection.isConnected)
             }
 
-            CommandGroup(after: .windowSize) {
-                Button("Pixel Accurate") {
-                    let size = connection.crtSettings.renderResolution.size
-                    if let window = NSApplication.shared.windows.first {
-                        // Account for title bar / toolbar overlapping the content area
-                        let layoutRect = window.contentLayoutRect
-                        let fullRect = window.contentView?.bounds ?? layoutRect
-                        let extraWidth = fullRect.width - layoutRect.width
-                        let extraHeight = fullRect.height - layoutRect.height
-                        window.setContentSize(NSSize(
-                            width: CGFloat(size.width) + extraWidth,
-                            height: CGFloat(size.height) + extraHeight
-                        ))
-                        window.center()
-                    }
-                }
-                .keyboardShortcut("1", modifiers: .command)
-            }
-
             CommandMenu("Preset") {
                 ForEach(CRTPreset.allCases) { preset in
                     let isSelected = connection.presetManager.selectedIdentifier == .builtIn(preset)
@@ -139,16 +120,12 @@ struct C64U_ViewerApp: App {
                 if case .custom(let id) = connection.presetManager.selectedIdentifier {
                     Button("Delete Preset") {
                         connection.presetManager.deleteCustom(id: id)
-                        var settings = connection.presetManager.settings(for: connection.presetManager.selectedIdentifier)
-                        settings.renderResolution = connection.crtSettings.renderResolution
-                        connection.crtSettings = settings
+                        connection.crtSettings = connection.presetManager.settings(
+                            for: connection.presetManager.selectedIdentifier
+                        )
                     }
                 }
             }
-        }
-
-        Settings {
-            SettingsView(connection: connection)
         }
     }
 }

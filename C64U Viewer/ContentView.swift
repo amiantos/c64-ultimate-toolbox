@@ -7,7 +7,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State var connection: C64Connection
-    @State private var showToolboxOverlay = false
+    @State private var showOverlay = false
 
     var body: some View {
         ZStack {
@@ -43,25 +43,25 @@ struct ContentView: View {
                     .padding(8)
                 }
 
-                // Clickable area for toolbox overlay (Toolbox Mode only)
-                if connection.connectionMode == .toolbox && !showToolboxOverlay {
+                // Clickable area to show overlay
+                if !showOverlay {
                     Color.clear
                         .contentShape(Rectangle())
-                        .onTapGesture { showToolboxOverlay = true }
+                        .onTapGesture { showOverlay = true }
                 }
             }
 
-            // Toolbox overlay
-            if showToolboxOverlay && connection.connectionMode == .toolbox {
-                ToolboxOverlayView(connection: connection) {
-                    showToolboxOverlay = false
+            // Unified overlay (works in both Viewer and Toolbox modes)
+            if showOverlay && connection.isConnected {
+                OverlayContainerView(connection: connection) {
+                    showOverlay = false
                 }
             }
         }
         .frame(minWidth: 480, minHeight: 340)
         .onChange(of: connection.isConnected) { _, isConnected in
             if !isConnected {
-                showToolboxOverlay = false
+                showOverlay = false
             }
         }
     }

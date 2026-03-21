@@ -4,24 +4,6 @@
 
 import Foundation
 
-enum CRTRenderResolution: String, CaseIterable, Identifiable, Sendable, Codable {
-    case x2 = "768x544 (2x)"
-    case x3 = "1152x816 (3x)"
-    case x4 = "1536x1088 (4x)"
-    case x5 = "1920x1360 (5x)"
-
-    var id: String { rawValue }
-
-    var size: (width: Int, height: Int) {
-        switch self {
-        case .x2: return (768, 544)
-        case .x3: return (1152, 816)
-        case .x4: return (1536, 1088)
-        case .x5: return (1920, 1360)
-        }
-    }
-}
-
 struct CRTSettings: Equatable, Sendable, Codable {
     var scanlineIntensity: Float = 0.0
     var scanlineWidth: Float = 0.5
@@ -36,13 +18,6 @@ struct CRTSettings: Equatable, Sendable, Codable {
     var maskIntensity: Float = 0.0
     var curvatureAmount: Float = 0.0
     var vignetteStrength: Float = 0.0
-    var renderResolution: CRTRenderResolution = .x4
-
-    private enum CodingKeys: String, CodingKey {
-        case scanlineIntensity, scanlineWidth, blurRadius, bloomIntensity, bloomRadius
-        case afterglowStrength, afterglowDecaySpeed, tintMode, tintStrength
-        case maskType, maskIntensity, curvatureAmount, vignetteStrength
-    }
 }
 
 enum CRTPreset: String, CaseIterable, Identifiable, Sendable, Codable {

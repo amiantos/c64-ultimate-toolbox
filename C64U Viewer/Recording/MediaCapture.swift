@@ -33,10 +33,11 @@ final class MediaCapture {
         guard let renderer else { return }
 
         // Create a managed readback texture for screenshot (one-shot, OK to be slow)
-        let crtSize = renderer.crtSettings.renderResolution.size
+        let size = renderer.currentRenderSize
+        guard size.width > 0 && size.height > 0 else { return }
         let desc = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .bgra8Unorm,
-            width: crtSize.width, height: crtSize.height,
+            width: size.width, height: size.height,
             mipmapped: false
         )
         desc.usage = [.shaderRead, .renderTarget]

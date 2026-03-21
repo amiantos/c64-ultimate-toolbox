@@ -5,8 +5,9 @@
 import SwiftUI
 internal import UniformTypeIdentifiers
 
-struct ToolboxOverlayView: View {
+struct ControlsOverlayView: View {
     @Bindable var connection: C64Connection
+    let onCustomize: () -> Void
     let onDismiss: () -> Void
 
     @State private var showResetConfirm = false
@@ -16,30 +17,30 @@ struct ToolboxOverlayView: View {
     private let tileColumns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.4)
-                .onTapGesture { onDismiss() }
+        ScrollView {
+            VStack(spacing: 16) {
+                header
 
-            ScrollView {
-                VStack(spacing: 16) {
-                    header
-                    statusArea
+                // Toolbox-only sections
+                if connection.connectionMode == .toolbox {
                     deviceInfoTile
-                    audioSection
-                    presetSection
-                    controlGrid
                 }
-                .padding(20)
+
+                audioSection
+                presetSection
+
+                // Toolbox-only controls
+                if connection.connectionMode == .toolbox {
+                    controlGrid
+                    statusArea
+                }
             }
-            .frame(width: 400)
-            .frame(maxHeight: 560)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-            .shadow(radius: 20)
+            .padding(20)
         }
-        .onKeyPress(.escape) {
-            onDismiss()
-            return .handled
-        }
+        .frame(width: 400)
+        .frame(maxHeight: 560)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .shadow(radius: 20)
         .confirmationDialog("Reset Machine?", isPresented: $showResetConfirm) {
             Button("Reset", role: .destructive) { connection.machineAction(.reset) }
         }
@@ -55,7 +56,7 @@ struct ToolboxOverlayView: View {
 
     private var header: some View {
         HStack {
-            Text("Toolbox")
+            Text(connection.connectionMode == .toolbox ? "Toolbox" : "Controls")
                 .font(.title3)
                 .fontWeight(.semibold)
             Spacer()
@@ -68,7 +69,7 @@ struct ToolboxOverlayView: View {
         }
     }
 
-    // MARK: - Status
+    // MARK: - Status (Toolbox only)
 
     @ViewBuilder
     private var statusArea: some View {
@@ -93,7 +94,7 @@ struct ToolboxOverlayView: View {
         }
     }
 
-    // MARK: - Device Info
+    // MARK: - Device Info (Toolbox only)
 
     @ViewBuilder
     private var deviceInfoTile: some View {
@@ -168,7 +169,7 @@ struct ToolboxOverlayView: View {
                 .labelsHidden()
                 Spacer()
                 Button("Customize") {
-                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                    onCustomize()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
@@ -178,7 +179,7 @@ struct ToolboxOverlayView: View {
         }
     }
 
-    // MARK: - Control Grid
+    // MARK: - Control Grid (Toolbox only)
 
     private var controlGrid: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -258,33 +259,4 @@ struct ToolboxOverlayView: View {
             .fontWeight(.medium)
             .foregroundStyle(.secondary)
     }
-}
-
-#Preview("With Device Info") {
-    let connection = C64Connection()
-    connection.deviceInfo = DeviceInfo(
-        product: "C64 Ultimate",
-        firmwareVersion: "3.14",
-        fpgaVersion: "121",
-        coreVersion: "1.47",
-        hostname: "C64-Ultimate-3258D7",
-        uniqueId: "25A73F"
-    )
-    connection.streamsActive = true
-    return ToolboxOverlayView(connection: connection) {}
-        .frame(width: 768, height: 544)
-}
-
-#Preview("No Device Info") {
-    let connection = C64Connection()
-    connection.connectionError = "Connection timed out"
-    return ToolboxOverlayView(connection: connection) {}
-        .frame(width: 768, height: 544)
-}
-
-#Preview("Rebooting") {
-    let connection = C64Connection()
-    connection.isWaitingForReboot = true
-    return ToolboxOverlayView(connection: connection) {}
-        .frame(width: 768, height: 544)
 }

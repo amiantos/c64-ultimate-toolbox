@@ -39,7 +39,8 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
 
     private var currentWidth: Int = 0
     private var currentHeight: Int = 0
-    private var currentCRTResolution: CRTRenderResolution = .x4
+    private var currentDrawableWidth: Int = 0
+    private var currentDrawableHeight: Int = 0
     private var lastFrameTime: CFAbsoluteTime = 0
 
     var captureNextFrame = false
@@ -49,6 +50,7 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
     private var didUploadNewFrame = false
 
     var crtSettings = CRTSettings()
+    var currentRenderSize: (width: Int, height: Int) { (currentDrawableWidth, currentDrawableHeight) }
     private var pendingFrameData: Data?
     private var pendingWidth: Int = 0
     private var pendingHeight: Int = 0
@@ -111,21 +113,10 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
         pendingFrameData = nil
         didUploadNewFrame = true
 
-        let resolutionChanged = currentCRTResolution != crtSettings.renderResolution
-
         if frameTexture == nil || currentWidth != width || currentHeight != height {
             currentWidth = width
             currentHeight = height
             frameTexture = makeTexture(width: width, height: height, storageMode: .managed)
-        }
-
-        if resolutionChanged || accumTextures.isEmpty {
-            currentCRTResolution = crtSettings.renderResolution
-            let crtSize = currentCRTResolution.size
-            guard let tex0 = makeTexture(width: crtSize.width, height: crtSize.height, storageMode: .private),
-                  let tex1 = makeTexture(width: crtSize.width, height: crtSize.height, storageMode: .private) else { return }
-            accumTextures = [tex0, tex1]
-            accumIndex = 0
         }
 
         guard let texture = frameTexture else { return }
@@ -167,7 +158,21 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
         let dtMs = lastFrameTime > 0 ? Float((now - lastFrameTime) * 1000.0) : 16.67
         lastFrameTime = now
 
-        let crtSize = currentCRTResolution.size
+        // Use drawable size for CRT rendering
+        let drawableSize = view.drawableSize
+        let drawW = Int(drawableSize.width)
+        let drawH = Int(drawableSize.height)
+
+        if drawW != currentDrawableWidth || drawH != currentDrawableHeight || accumTextures.isEmpty {
+            currentDrawableWidth = drawW
+            currentDrawableHeight = drawH
+            if drawW > 0 && drawH > 0 {
+                guard let tex0 = makeTexture(width: drawW, height: drawH, storageMode: .private),
+                      let tex1 = makeTexture(width: drawW, height: drawH, storageMode: .private) else { return }
+                accumTextures = [tex0, tex1]
+                accumIndex = 0
+            }
+        }
 
         var uniforms = CRTUniformsBuffer(
             scanlineIntensity: crtSettings.scanlineIntensity,
@@ -184,8 +189,8 @@ final class MetalRenderer: NSObject, MTKViewDelegate {
             curvatureAmount: crtSettings.curvatureAmount,
             vignetteStrength: crtSettings.vignetteStrength,
             dtMs: dtMs,
-            outputWidth: Float(crtSize.width),
-            outputHeight: Float(crtSize.height),
+            outputWidth: Float(drawW),
+            outputHeight: Float(drawH),
             sourceWidth: Float(currentWidth),
             sourceHeight: Float(currentHeight)
         )

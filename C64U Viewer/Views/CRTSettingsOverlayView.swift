@@ -4,27 +4,61 @@
 
 import SwiftUI
 
-struct SettingsView: View {
+struct CRTSettingsOverlayView: View {
     @Bindable var connection: C64Connection
+    let onBack: () -> Void
+    let onDismiss: () -> Void
+
     @State private var showingSaveAs = false
     @State private var newPresetName = ""
 
     var body: some View {
         ScrollView {
-            Form {
-                audioSection
-                renderingSection
-                presetSection
-                scanlineSection
-                bloomBlurSection
-                tintSection
-                phosphorMaskSection
-                screenShapeSection
-                afterglowSection
+            VStack(spacing: 16) {
+                // Header
+                HStack {
+                    Button { onBack() } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("Back")
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.blue)
+
+                    Spacer()
+
+                    Text("CRT Settings")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+
+                    Spacer()
+
+                    Button { onDismiss() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Form {
+                    presetSection
+                    scanlineSection
+                    bloomBlurSection
+                    tintSection
+                    phosphorMaskSection
+                    screenShapeSection
+                    afterglowSection
+                }
+                .formStyle(.grouped)
             }
-            .formStyle(.grouped)
+            .padding(20)
         }
-        .frame(width: 480, height: 640)
+        .frame(width: 460)
+        .frame(maxHeight: 600)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .shadow(radius: 20)
         .alert("Save As New Preset", isPresented: $showingSaveAs) {
             TextField("Preset Name", text: $newPresetName)
             Button("Save") {
@@ -37,29 +71,6 @@ struct SettingsView: View {
                 newPresetName = ""
             }
             Button("Cancel", role: .cancel) { newPresetName = "" }
-        }
-    }
-
-    private var audioSection: some View {
-        Section("Audio") {
-            SliderRow(label: "Volume", value: Binding(
-                get: { connection.volume },
-                set: {
-                    connection.volume = $0
-                    connection.isMuted = false
-                }
-            ), range: 0...1)
-            SliderRow(label: "Balance", value: $connection.balance, range: -1...1)
-        }
-    }
-
-    private var renderingSection: some View {
-        Section("Rendering") {
-            Picker("Render Resolution", selection: $connection.crtSettings.renderResolution) {
-                ForEach(CRTRenderResolution.allCases) { res in
-                    Text(res.rawValue).tag(res)
-                }
-            }
         }
     }
 
@@ -99,9 +110,9 @@ struct SettingsView: View {
                 if case .custom(let id) = connection.presetManager.selectedIdentifier {
                     Button("Delete", role: .destructive) {
                         connection.presetManager.deleteCustom(id: id)
-                        var settings = connection.presetManager.settings(for: connection.presetManager.selectedIdentifier)
-                        settings.renderResolution = connection.crtSettings.renderResolution
-                        connection.crtSettings = settings
+                        connection.crtSettings = connection.presetManager.settings(
+                            for: connection.presetManager.selectedIdentifier
+                        )
                     }
                 }
             }
@@ -169,22 +180,5 @@ struct SettingsView: View {
                 connection.applySettingsChange()
             }
         )
-    }
-}
-
-struct SliderRow: View {
-    let label: String
-    @Binding var value: Float
-    let range: ClosedRange<Float>
-
-    var body: some View {
-        HStack {
-            Text(label)
-                .frame(width: 110, alignment: .leading)
-            Slider(value: $value, in: range)
-            Text(String(format: "%.2f", value))
-                .monospacedDigit()
-                .frame(width: 40, alignment: .trailing)
-        }
     }
 }

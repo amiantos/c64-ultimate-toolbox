@@ -22,9 +22,6 @@ final class C64Connection {
     var crtSettings = CRTSettings() {
         didSet {
             renderer.crtSettings = crtSettings
-            if oldValue.renderResolution != crtSettings.renderResolution {
-                UserDefaults.standard.set(crtSettings.renderResolution.rawValue, forKey: "c64_renderResolution")
-            }
         }
     }
 
@@ -57,9 +54,7 @@ final class C64Connection {
 
     func selectPreset(_ id: PresetIdentifier) {
         presetManager.selectedIdentifier = id
-        var settings = presetManager.settings(for: id)
-        settings.renderResolution = crtSettings.renderResolution
-        crtSettings = settings
+        crtSettings = presetManager.settings(for: id)
         presetManager.schedulePersist()
     }
 
@@ -84,12 +79,7 @@ final class C64Connection {
         }
 
         // Load settings from preset manager
-        var settings = presetManager.settings(for: presetManager.selectedIdentifier)
-        if let res = UserDefaults.standard.string(forKey: "c64_renderResolution"),
-           let r = CRTRenderResolution(rawValue: res) {
-            settings.renderResolution = r
-        }
-        crtSettings = settings
+        crtSettings = presetManager.settings(for: presetManager.selectedIdentifier)
 
         mediaCapture.renderer = renderer
         mediaCapture.audioPlayer = audioPlayer
@@ -307,7 +297,8 @@ final class C64Connection {
         if mediaCapture.isRecording {
             mediaCapture.stopRecording()
         } else {
-            let size = crtSettings.renderResolution.size
+            let size = renderer.currentRenderSize
+            guard size.width > 0 && size.height > 0 else { return }
             mediaCapture.startRecording(resolution: size)
         }
     }
