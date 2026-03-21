@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import Foundation
-import Network
 import Observation
 
 @Observable
@@ -13,7 +12,6 @@ final class C64Connection {
     }
     var videoPort: UInt16 = 11000
     var audioPort: UInt16 = 11001
-    var controlPort: UInt16 = 64
 
     var isConnected = false
     let presetManager = PresetManager()
@@ -49,7 +47,6 @@ final class C64Connection {
     let videoReceiver: UDPVideoReceiver
     let audioReceiver = UDPAudioReceiver()
     let audioPlayer = AudioPlayer()
-    let controlClient = TCPControlClient()
     let renderer = MetalRenderer()
     let mediaCapture = MediaCapture()
 
@@ -120,21 +117,6 @@ final class C64Connection {
         audioReceiver.start(port: audioPort)
         audioPlayer.start()
 
-        // Get local IP and send control commands to start streaming
-        if let localIP = getLocalIPAddress() {
-            controlClient.sendEnableStream(
-                host: hostname, controlPort: controlPort,
-                streamId: 0, clientIP: localIP, clientPort: videoPort
-            )
-            // Small delay before starting audio stream
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [self] in
-                controlClient.sendEnableStream(
-                    host: hostname, controlPort: controlPort,
-                    streamId: 1, clientIP: localIP, clientPort: audioPort
-                )
-            }
-        }
-
         isConnected = true
         startFPSCounter()
     }
@@ -159,9 +141,6 @@ final class C64Connection {
             mediaCapture.stopRecording()
         }
 
-        controlClient.sendDisableStream(host: hostname, controlPort: controlPort, streamId: 0)
-        controlClient.sendDisableStream(host: hostname, controlPort: controlPort, streamId: 1)
-
         videoReceiver.stop()
         audioReceiver.stop()
         audioPlayer.stop()
@@ -181,31 +160,6 @@ final class C64Connection {
         }
         timer.resume()
         fpsTimer = timer
-    }
-
-    private func getLocalIPAddress() -> String? {
-        var address: String?
-        var ifaddr: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&ifaddr) == 0, let firstAddr = ifaddr else { return nil }
-        defer { freeifaddrs(ifaddr) }
-
-        for ptr in sequence(first: firstAddr, next: { $0.pointee.ifa_next }) {
-            let flags = Int32(ptr.pointee.ifa_flags)
-            let addr = ptr.pointee.ifa_addr.pointee
-
-            guard (flags & (IFF_UP | IFF_RUNNING)) != 0,
-                  (flags & IFF_LOOPBACK) == 0,
-                  addr.sa_family == UInt8(AF_INET) else { continue }
-
-            var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            if getnameinfo(ptr.pointee.ifa_addr, socklen_t(addr.sa_len),
-                           &hostname, socklen_t(hostname.count),
-                           nil, 0, NI_NUMERICHOST) == 0 {
-                address = String(cString: hostname)
-                break
-            }
-        }
-        return address
     }
 
 }
