@@ -228,6 +228,18 @@ struct ControlsOverlayView: View {
                 controlTile("Power Off", icon: "power", color: .red) {
                     showPowerOffConfirm = true
                 }
+
+                if let forwarder = connection.keyboardForwarder {
+                    if forwarder.isEnabled {
+                        controlTile("Keyboard", icon: "keyboard.fill", color: .blue) {
+                            forwarder.isEnabled = false
+                        }
+                    } else {
+                        controlTile("Keyboard", icon: "keyboard", color: .gray) {
+                            forwarder.isEnabled = true
+                        }
+                    }
+                }
             }
         }
     }

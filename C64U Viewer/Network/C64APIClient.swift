@@ -78,6 +78,21 @@ final class C64APIClient: Sendable {
         try await put("/v1/machine:menu_button")
     }
 
+    // MARK: - Memory Access
+
+    func readMem(address: Int, length: Int = 1) async throws -> Data {
+        let hex = String(format: "%04X", address)
+        let request = makeRequest("/v1/machine:readmem?address=\(hex)&length=\(length)", method: "GET")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse(response)
+        return data
+    }
+
+    func writeMem(address: Int, data: Data) async throws {
+        let hex = String(format: "%04X", address)
+        try await post("/v1/machine:writemem?address=\(hex)", body: data)
+    }
+
     // MARK: - HTTP Helpers
 
     @discardableResult

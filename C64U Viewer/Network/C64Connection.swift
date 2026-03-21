@@ -15,6 +15,7 @@ final class C64Connection {
     var apiClient: C64APIClient?
     var deviceInfo: DeviceInfo?
     var connectionError: String?
+    var keyboardForwarder: C64KeyboardForwarder?
 
     let presetManager = PresetManager()
     let recentConnections = RecentConnections()
@@ -126,6 +127,7 @@ final class C64Connection {
         connectionError = nil
         let client = C64APIClient(host: ip, password: password)
         apiClient = client
+        keyboardForwarder = C64KeyboardForwarder(client: client)
 
         // Start UDP listeners
         videoReceiver.start(port: videoPort)
@@ -173,6 +175,8 @@ final class C64Connection {
         audioPlayer.stop()
         isConnected = false
         connectionMode = nil
+        keyboardForwarder?.isEnabled = false
+        keyboardForwarder = nil
         apiClient = nil
         deviceInfo = nil
         connectionError = nil
