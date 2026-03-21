@@ -7,14 +7,17 @@ import Observation
 
 @Observable
 final class C64Connection {
-    var hostname: String = "c64u" {
-        didSet { UserDefaults.standard.set(hostname, forKey: "c64_hostname") }
-    }
     var videoPort: UInt16 = 11000
     var audioPort: UInt16 = 11001
 
     var isConnected = false
+    var connectionMode: ConnectionMode?
+    var apiClient: C64APIClient?
+    var deviceInfo: DeviceInfo?
+    var connectionError: String?
+
     let presetManager = PresetManager()
+    let recentConnections = RecentConnections()
 
     var crtSettings = CRTSettings() {
         didSet {
@@ -72,11 +75,6 @@ final class C64Connection {
     init() {
         videoReceiver = UDPVideoReceiver(frameAssembler: frameAssembler)
 
-        // Restore saved settings
-        if let saved = UserDefaults.standard.string(forKey: "c64_hostname"), !saved.isEmpty {
-            hostname = saved
-        }
-
         // Restore saved volume and balance
         if UserDefaults.standard.object(forKey: "c64_volume") != nil {
             volume = UserDefaults.standard.float(forKey: "c64_volume")
@@ -109,8 +107,35 @@ final class C64Connection {
         }
     }
 
-    func connect() {
+    // MARK: - Viewer Mode
+
+    func listen(videoPort: UInt16, audioPort: UInt16) {
         guard !isConnected else { return }
+
+        self.videoPort = videoPort
+        self.audioPort = audioPort
+        connectionMode = .viewer
+        connectionError = nil
+
+        videoReceiver.start(port: videoPort)
+        audioReceiver.start(port: audioPort)
+        audioPlayer.start()
+
+        recentConnections.addViewer(videoPort: videoPort, audioPort: audioPort)
+
+        isConnected = true
+        startFPSCounter()
+    }
+
+    // MARK: - Toolbox Mode
+
+    func connectToolbox(ip: String, password: String?, savePassword: Bool) {
+        guard !isConnected else { return }
+
+        connectionMode = .toolbox
+        connectionError = nil
+        let client = C64APIClient(host: ip, password: password)
+        apiClient = client
 
         // Start UDP listeners
         videoReceiver.start(port: videoPort)
@@ -119,7 +144,94 @@ final class C64Connection {
 
         isConnected = true
         startFPSCounter()
+
+        recentConnections.addToolbox(ipAddress: ip, password: password, savePassword: savePassword)
+
+        // Fetch device info and start streams via API
+        Task {
+            do {
+                let info = try await client.fetchInfo()
+                self.deviceInfo = info
+                print("C64U device: \(info.product) v\(info.firmwareVersion) (\(info.hostname))")
+
+                // Start video and audio streams
+                if let localIP = getLocalIPAddress() {
+                    try await client.startStream("video", clientIP: localIP, port: videoPort)
+                    try await client.startStream("audio", clientIP: localIP, port: audioPort)
+                }
+            } catch {
+                print("C64U API error: \(error.localizedDescription)")
+                self.connectionError = error.localizedDescription
+            }
+        }
     }
+
+    // MARK: - Disconnect
+
+    func disconnect() {
+        guard isConnected else { return }
+
+        if mediaCapture.isRecording {
+            mediaCapture.stopRecording()
+        }
+
+        // Stop streams via API in Toolbox Mode
+        if connectionMode == .toolbox, let client = apiClient {
+            Task {
+                try? await client.stopStream("video")
+                try? await client.stopStream("audio")
+            }
+        }
+
+        videoReceiver.stop()
+        audioReceiver.stop()
+        audioPlayer.stop()
+        isConnected = false
+        connectionMode = nil
+        apiClient = nil
+        deviceInfo = nil
+        connectionError = nil
+        fpsTimer?.cancel()
+        fpsTimer = nil
+        framesPerSecond = 0
+    }
+
+    // MARK: - Toolbox Actions
+
+    func runFile(type: RunnerType, data: Data) {
+        guard let client = apiClient else { return }
+        Task {
+            do {
+                switch type {
+                case .sid: try await client.runSID(data: data)
+                case .prg: try await client.runPRG(data: data)
+                case .crt: try await client.runCRT(data: data)
+                }
+            } catch {
+                print("C64U runner error: \(error.localizedDescription)")
+                self.connectionError = error.localizedDescription
+            }
+        }
+    }
+
+    func machineAction(_ action: MachineAction) {
+        guard let client = apiClient else { return }
+        Task {
+            do {
+                switch action {
+                case .reset: try await client.machineReset()
+                case .reboot: try await client.machineReboot()
+                case .powerOff: try await client.machinePowerOff()
+                case .menuButton: try await client.menuButton()
+                }
+            } catch {
+                print("C64U machine error: \(error.localizedDescription)")
+                self.connectionError = error.localizedDescription
+            }
+        }
+    }
+
+    // MARK: - Capture
 
     func takeScreenshot() {
         mediaCapture.takeScreenshot()
@@ -134,21 +246,7 @@ final class C64Connection {
         }
     }
 
-    func disconnect() {
-        guard isConnected else { return }
-
-        if mediaCapture.isRecording {
-            mediaCapture.stopRecording()
-        }
-
-        videoReceiver.stop()
-        audioReceiver.stop()
-        audioPlayer.stop()
-        isConnected = false
-        fpsTimer?.cancel()
-        fpsTimer = nil
-        framesPerSecond = 0
-    }
+    // MARK: - Private
 
     private func startFPSCounter() {
         let timer = DispatchSource.makeTimerSource(queue: .main)
@@ -162,4 +260,36 @@ final class C64Connection {
         fpsTimer = timer
     }
 
+    func getLocalIPAddress() -> String? {
+        var address: String?
+        var ifaddr: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&ifaddr) == 0, let firstAddr = ifaddr else { return nil }
+        defer { freeifaddrs(ifaddr) }
+
+        for ptr in sequence(first: firstAddr, next: { $0.pointee.ifa_next }) {
+            let flags = Int32(ptr.pointee.ifa_flags)
+            let addr = ptr.pointee.ifa_addr.pointee
+
+            guard (flags & (IFF_UP | IFF_RUNNING)) != 0,
+                  (flags & IFF_LOOPBACK) == 0,
+                  addr.sa_family == UInt8(AF_INET) else { continue }
+
+            var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            if getnameinfo(ptr.pointee.ifa_addr, socklen_t(addr.sa_len),
+                           &hostname, socklen_t(hostname.count),
+                           nil, 0, NI_NUMERICHOST) == 0 {
+                address = String(cString: hostname)
+                break
+            }
+        }
+        return address
+    }
+}
+
+enum RunnerType {
+    case sid, prg, crt
+}
+
+enum MachineAction {
+    case reset, reboot, powerOff, menuButton
 }

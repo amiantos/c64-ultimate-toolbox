@@ -260,9 +260,11 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "C64U Viewer";
+				INFOPLIST_FILE = "C64U Viewer/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "C64 Ultimate Toolbox";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 Brad Root. All rights reserved.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "C64 Ultimate Toolbox connects to your Commodore 64 Ultimate device on the local network to receive video and audio streams.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -296,9 +298,11 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "C64U Viewer";
+				INFOPLIST_FILE = "C64U Viewer/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "C64 Ultimate Toolbox";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2025 Brad Root. All rights reserved.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "C64 Ultimate Toolbox connects to your Commodore 64 Ultimate device on the local network to receive video and audio streams.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

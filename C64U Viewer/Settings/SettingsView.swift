@@ -36,18 +36,6 @@ struct SettingsView: View {
 
     private var generalTab: some View {
         Form {
-            Section("Connection") {
-                TextField("Hostname", text: $connection.hostname)
-                TextField("Video Port", text: Binding(
-                    get: { String(connection.videoPort) },
-                    set: { connection.videoPort = UInt16($0) ?? connection.videoPort }
-                ))
-                TextField("Audio Port", text: Binding(
-                    get: { String(connection.audioPort) },
-                    set: { connection.audioPort = UInt16($0) ?? connection.audioPort }
-                ))
-            }
-
             Section("Audio") {
                 SliderRow(label: "Volume", value: Binding(
                     get: { connection.volume },

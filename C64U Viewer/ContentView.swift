@@ -7,6 +7,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State var connection: C64Connection
+    @State private var showToolboxOverlay = false
 
     var body: some View {
         ZStack {
@@ -15,21 +16,8 @@ struct ContentView: View {
             MetalView(renderer: connection.renderer)
                 .aspectRatio(CGFloat(384.0 / 272.0), contentMode: .fit)
 
-            // Connection status overlay
             if !connection.isConnected {
-                VStack(spacing: 12) {
-                    Text("C64U Viewer")
-                        .font(.title)
-                        .foregroundStyle(.white)
-                    Text("Not Connected")
-                        .foregroundStyle(.secondary)
-                    Button("Connect") {
-                        connection.connect()
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                .padding(24)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                HomeView(connection: connection)
             }
 
             // Status bar overlay
@@ -54,8 +42,27 @@ struct ContentView: View {
                     }
                     .padding(8)
                 }
+
+                // Clickable area for toolbox overlay (Toolbox Mode only)
+                if connection.connectionMode == .toolbox && !showToolboxOverlay {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { showToolboxOverlay = true }
+                }
+            }
+
+            // Toolbox overlay
+            if showToolboxOverlay && connection.connectionMode == .toolbox {
+                ToolboxOverlayView(connection: connection) {
+                    showToolboxOverlay = false
+                }
             }
         }
         .frame(minWidth: 480, minHeight: 340)
+        .onChange(of: connection.isConnected) { _, isConnected in
+            if !isConnected {
+                showToolboxOverlay = false
+            }
+        }
     }
 }

@@ -31,17 +31,11 @@ struct C64U_ViewerApp: App {
         .defaultSize(width: 768, height: 544)
         .commands {
             CommandMenu("Stream") {
-                if connection.isConnected {
-                    Button("Disconnect") {
-                        connection.disconnect()
-                    }
-                    .keyboardShortcut("d", modifiers: .command)
-                } else {
-                    Button("Connect") {
-                        connection.connect()
-                    }
-                    .keyboardShortcut("d", modifiers: .command)
+                Button("Disconnect") {
+                    connection.disconnect()
                 }
+                .keyboardShortcut("d", modifiers: .command)
+                .disabled(!connection.isConnected)
 
                 Divider()
 
