@@ -10,11 +10,19 @@ struct SettingsView: View {
     @State private var newPresetName = ""
 
     var body: some View {
-        TabView {
-            generalTab
-                .tabItem { Label("General", systemImage: "gear") }
-            crtEffectsTab
-                .tabItem { Label("CRT Effects", systemImage: "tv") }
+        ScrollView {
+            Form {
+                audioSection
+                renderingSection
+                presetSection
+                scanlineSection
+                bloomBlurSection
+                tintSection
+                phosphorMaskSection
+                screenShapeSection
+                afterglowSection
+            }
+            .formStyle(.grouped)
         }
         .frame(width: 480, height: 640)
         .alert("Save As New Preset", isPresented: $showingSaveAs) {
@@ -32,46 +40,26 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - General Tab
-
-    private var generalTab: some View {
-        Form {
-            Section("Audio") {
-                SliderRow(label: "Volume", value: Binding(
-                    get: { connection.volume },
-                    set: {
-                        connection.volume = $0
-                        connection.isMuted = false
-                    }
-                ), range: 0...1)
-                SliderRow(label: "Balance", value: $connection.balance, range: -1...1)
-            }
-
-            Section("Rendering") {
-                Picker("Render Resolution", selection: $connection.crtSettings.renderResolution) {
-                    ForEach(CRTRenderResolution.allCases) { res in
-                        Text(res.rawValue).tag(res)
-                    }
+    private var audioSection: some View {
+        Section("Audio") {
+            SliderRow(label: "Volume", value: Binding(
+                get: { connection.volume },
+                set: {
+                    connection.volume = $0
+                    connection.isMuted = false
                 }
-            }
+            ), range: 0...1)
+            SliderRow(label: "Balance", value: $connection.balance, range: -1...1)
         }
-        .formStyle(.grouped)
     }
 
-    // MARK: - CRT Effects Tab
-
-    private var crtEffectsTab: some View {
-        ScrollView {
-            Form {
-                presetSection
-                scanlineSection
-                bloomBlurSection
-                tintSection
-                phosphorMaskSection
-                screenShapeSection
-                afterglowSection
+    private var renderingSection: some View {
+        Section("Rendering") {
+            Picker("Render Resolution", selection: $connection.crtSettings.renderResolution) {
+                ForEach(CRTRenderResolution.allCases) { res in
+                    Text(res.rawValue).tag(res)
+                }
             }
-            .formStyle(.grouped)
         }
     }
 

@@ -158,3 +158,8 @@ struct HomeView: View {
         .background(.background.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
     }
 }
+
+#Preview {
+    HomeView(connection: C64Connection())
+        .frame(width: 768, height: 544)
+}
