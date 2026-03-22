@@ -12,10 +12,10 @@ struct VideoPacketHeader {
 }
 
 final class FrameAssembler: @unchecked Sendable {
-    static let pixelsPerLine = 384
-    static let bytesPerLine = 192
-    static let linesPerPacket = 4
-    static let videoHeaderSize = 12
+    nonisolated static let pixelsPerLine = 384
+    nonisolated static let bytesPerLine = 192
+    nonisolated static let linesPerPacket = 4
+    nonisolated static let videoHeaderSize = 12
     static let videoPacketSize = 780
     static let palHeight = 272
     static let ntscHeight = 240

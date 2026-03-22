@@ -195,10 +195,10 @@ final class MediaCapture {
         videoInput?.markAsFinished()
         audioInput?.markAsFinished()
         assetWriter?.finishWriting { [weak self] in
-            if let error = self?.assetWriter?.error {
-                print("Asset writer error: \(error)")
-            }
             DispatchQueue.main.async {
+                if let error = self?.assetWriter?.error {
+                    print("Asset writer error: \(error)")
+                }
                 self?.assetWriter = nil
                 self?.videoInput = nil
                 self?.audioInput = nil

@@ -1,0 +1,81 @@
+# Promotional Text
+
+Control and stream your Commodore 64 Ultimate from your Mac. View the live video feed with authentic CRT effects, manage your device, and type remotely — all from one app.
+
+--
+
+# App Description
+
+C64 Ultimate Toolbox connects to your Commodore 64 Ultimate device over your local network, giving you a live video and audio stream with hardware-accelerated CRT effects powered by Metal — plus full device control via the C64U REST API.
+
+-- Two Modes --
+Viewer Mode listens for video and audio streams on configurable ports — just hit Listen and go. Toolbox Mode connects to your C64U's REST API for a fully integrated experience: automatic stream setup, device info, file loading, machine control, and keyboard forwarding.
+
+-- CRT Effects --
+Choose from 8 built-in presets — from a subtle Home CRT to a classic P1 Green phosphor monitor, an Old TV with heavy scanlines, or a clean Arcade cabinet look. Every effect parameter is fully adjustable: scanlines, bloom, blur, phosphor masks (aperture grille, shadow mask, slot mask), screen curvature, vignette, color tinting, and phosphor afterglow with realistic per-channel decay. The CRT shader renders at your window size — just resize the window to your preferred resolution.
+
+-- Toolbox Controls --
+In Toolbox Mode, tap the video to access device controls:
+- View device info (product, firmware, hostname)
+- Start and stop video/audio streams
+- Load and run SID, PRG, and CRT files directly from your Mac
+- Reset, reboot, or power off the machine
+- Access the Ultimate menu
+- Forward your Mac keyboard to the C64 for remote typing
+
+-- Keyboard Forwarding --
+Type on your Mac keyboard and have it appear on the C64 in real time. An on-screen key strip provides C64-specific keys like F1-F8, RUN/STOP, CLR/HOME, and cursor keys. Works with BASIC and programs that read input through the KERNAL.
+
+-- Capture --
+Take PNG screenshots or record video with all CRT effects baked in. Recordings are saved as MOV files with H.264 video and synchronized audio.
+
+-- Customizable --
+Create and save your own CRT presets with 13 independently adjustable shader parameters. All settings update in real time so you can dial in exactly the look you want.
+
+-- Features --
+- Two connection modes: passive Viewer and full-featured Toolbox
+- Real-time video and audio streaming over your local network
+- REST API integration with device info, file runners, and machine control
+- Keyboard forwarding with on-screen C64 key strip
+- 8 built-in CRT effect presets with full customization
+- Unlimited custom presets
+- Screenshot and video recording with effects applied
+- Audio balance control to correct stereo imbalance
+- Volume control with mute toggle
+- Supports both PAL and NTSC formats
+- Recent connections history for quick reconnection
+- Password-protected device support
+- Live FPS counter
+- Pure native macOS app — no external dependencies
+
+-- Requirements --
+- A Commodore 64 Ultimate device on your local network
+- macOS 14.6 or later
+- Toolbox Mode requires firmware 3.11+ with REST API enabled
+
+--
+
+# App Review Notes
+
+This app connects to a Commodore 64 Ultimate retro computing device on the local network. It has two modes:
+
+1. Viewer Mode: Listens for UDP video/audio streams broadcast by the device. No outbound connections — it simply receives data.
+
+2. Toolbox Mode: Connects to the device's HTTP REST API to start/stop streams, load files, control the machine, and forward keyboard input. This mode requires the device's IP address and optionally a password.
+
+You need a Commodore 64 Ultimate device to see the app fully working. Please see the attached video for a demonstration.
+
+Thank you!
+
+--
+
+# Entitlement Notes
+
+com.apple.security.network.client
+Required to communicate with the Commodore 64 Ultimate device's REST API over HTTP on the local network (Toolbox Mode). Also required for UDP stream reception to function correctly in the sandbox.
+
+com.apple.security.network.server
+Required to listen for incoming UDP video and audio stream data from the Commodore 64 Ultimate device on the local network.
+
+com.apple.security.files.user-selected.read-write
+Required to save screenshots (PNG) and video recordings (MOV) to user-chosen locations on disk, and to select SID/PRG/CRT files for loading onto the device.
