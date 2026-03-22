@@ -37,7 +37,7 @@ struct ContentView: View {
                     Spacer()
 
                     if keyboardActive, let forwarder = connection.keyboardForwarder {
-                        C64KeyStripView(forwarder: forwarder)
+                        C64KeyStripView(forwarder: forwarder, connection: connection)
                     }
 
                     HStack {

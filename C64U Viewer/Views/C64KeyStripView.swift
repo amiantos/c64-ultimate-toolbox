@@ -6,6 +6,7 @@ import SwiftUI
 
 struct C64KeyStripView: View {
     let forwarder: C64KeyboardForwarder
+    let connection: C64Connection
 
     private let topRow: [SpecialKey] = [
         .f1, .f2, .f3, .f4, .f5, .f6, .f7, .f8
@@ -25,6 +26,9 @@ struct C64KeyStripView: View {
                 }
             }
             HStack(spacing: 4) {
+                actionButton("MENU") {
+                    connection.machineAction(.menuButton)
+                }
                 ForEach(bottomRow) { key in
                     keyButton(key)
                 }
@@ -45,6 +49,18 @@ struct C64KeyStripView: View {
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
                 .background(.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func actionButton(_ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(.blue.opacity(0.3), in: RoundedRectangle(cornerRadius: 4))
         }
         .buttonStyle(.plain)
     }

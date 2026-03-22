@@ -13,6 +13,9 @@ struct ControlsOverlayView: View {
     @State private var showResetConfirm = false
     @State private var showRebootConfirm = false
     @State private var showPowerOffConfirm = false
+    @State private var showKeyboardInfo = false
+
+    private static let keyboardInfoShownKey = "c64_keyboard_info_shown"
 
     private let tileColumns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
 
@@ -27,12 +30,13 @@ struct ControlsOverlayView: View {
                 }
 
                 audioSection
-                presetSection
 
-                // Toolbox-only controls
                 if connection.connectionMode == .toolbox {
                     controlGrid
                     statusArea
+                } else {
+                    // Viewer mode: just CRT filter button
+                    viewerControls
                 }
             }
             .padding(20)
@@ -49,6 +53,15 @@ struct ControlsOverlayView: View {
         }
         .confirmationDialog("Power Off Machine?", isPresented: $showPowerOffConfirm) {
             Button("Power Off", role: .destructive) { connection.machineAction(.powerOff) }
+        }
+        .alert("Keyboard Forwarding", isPresented: $showKeyboardInfo) {
+            Button("Enable") {
+                UserDefaults.standard.set(true, forKey: Self.keyboardInfoShownKey)
+                connection.keyboardForwarder?.isEnabled = true
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Keyboard input is forwarded to the C64 via the KERNAL keyboard buffer. This works with BASIC and programs that read input through the KERNAL, but does not work in the Ultimate menu or with most games that read the keyboard hardware directly.")
         }
     }
 
@@ -139,43 +152,16 @@ struct ControlsOverlayView: View {
         }
     }
 
-    // MARK: - Preset
+    // MARK: - Viewer Controls
 
-    private var presetSection: some View {
+    private var viewerControls: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("CRT Preset")
-            HStack(spacing: 12) {
-                Image(systemName: "tv")
-                    .font(.title2)
-                    .foregroundStyle(.indigo)
-                    .frame(width: 36)
-                Picker("Preset", selection: Binding(
-                    get: { connection.presetManager.selectedIdentifier },
-                    set: { connection.selectPreset($0) }
-                )) {
-                    ForEach(CRTPreset.allCases) { preset in
-                        let modified = connection.presetManager.isModified(preset)
-                        Text(modified ? "\(preset.rawValue) *" : preset.rawValue)
-                            .tag(PresetIdentifier.builtIn(preset))
-                    }
-                    if !connection.presetManager.customPresets.isEmpty {
-                        Divider()
-                        ForEach(connection.presetManager.customPresets) { custom in
-                            Text(custom.name)
-                                .tag(PresetIdentifier.custom(custom.id))
-                        }
-                    }
-                }
-                .labelsHidden()
-                Spacer()
-                Button("Customize") {
+            sectionHeader("Controls")
+            LazyVGrid(columns: tileColumns, spacing: 10) {
+                controlTile("CRT Filter", icon: "tv", color: .indigo) {
                     onCustomize()
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
-            .padding(12)
-            .background(.background.opacity(0.6), in: RoundedRectangle(cornerRadius: 12))
         }
     }
 
@@ -229,6 +215,10 @@ struct ControlsOverlayView: View {
                     showPowerOffConfirm = true
                 }
 
+                controlTile("CRT Filter", icon: "tv", color: .indigo) {
+                    onCustomize()
+                }
+
                 if let forwarder = connection.keyboardForwarder {
                     if forwarder.isEnabled {
                         controlTile("Keyboard", icon: "keyboard.fill", color: .blue) {
@@ -236,7 +226,11 @@ struct ControlsOverlayView: View {
                         }
                     } else {
                         controlTile("Keyboard", icon: "keyboard", color: .gray) {
-                            forwarder.isEnabled = true
+                            if UserDefaults.standard.bool(forKey: Self.keyboardInfoShownKey) {
+                                forwarder.isEnabled = true
+                            } else {
+                                showKeyboardInfo = true
+                            }
                         }
                     }
                 }
