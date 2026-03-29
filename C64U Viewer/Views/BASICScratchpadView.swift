@@ -10,7 +10,6 @@ struct BASICScratchpadView: View {
     let onBack: () -> Void
     let onDismiss: () -> Void
 
-    @State private var basicCode: String = BASICSamples.helloWorld
     @State private var errorMessage: String?
     @State private var isUploading = false
     @State private var showSuccess = false
@@ -23,7 +22,7 @@ struct BASICScratchpadView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 12)
 
-            BASICEditorView(text: $basicCode)
+            BASICEditorView(text: $connection.basicScratchpadCode)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .padding(.horizontal, 20)
 
@@ -90,7 +89,7 @@ struct BASICScratchpadView: View {
                     .font(.caption)
                     .foregroundStyle(.green)
             } else {
-                let lineCount = basicCode.split(separator: "\n", omittingEmptySubsequences: true).count
+                let lineCount = connection.basicScratchpadCode.split(separator: "\n", omittingEmptySubsequences: true).count
                 Text("\(lineCount) line\(lineCount == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -116,7 +115,7 @@ struct BASICScratchpadView: View {
                 Menu("Samples") {
                     ForEach(BASICSamples.all, id: \.name) { sample in
                         Button(sample.name) {
-                            basicCode = sample.code
+                            connection.basicScratchpadCode = sample.code
                             errorMessage = nil
                             showSuccess = false
                         }
@@ -145,7 +144,7 @@ struct BASICScratchpadView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.regular)
-            .disabled(basicCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isUploading)
+            .disabled(connection.basicScratchpadCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isUploading)
         }
     }
 
@@ -177,7 +176,7 @@ struct BASICScratchpadView: View {
 
     private func uploadProgram() {
         guard let client = connection.apiClient else { return }
-        let code = basicCode
+        let code = connection.basicScratchpadCode
 
         errorMessage = nil
         showSuccess = false
@@ -218,7 +217,7 @@ struct BASICScratchpadView: View {
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url,
            let content = try? String(contentsOf: url, encoding: .utf8) {
-            basicCode = content
+            connection.basicScratchpadCode = content
             errorMessage = nil
             showSuccess = false
         }
@@ -229,7 +228,7 @@ struct BASICScratchpadView: View {
         panel.allowedContentTypes = [UTType(filenameExtension: "bas") ?? .plainText]
         panel.nameFieldStringValue = "program.bas"
         if panel.runModal() == .OK, let url = panel.url {
-            try? basicCode.write(to: url, atomically: true, encoding: .utf8)
+            try? connection.basicScratchpadCode.write(to: url, atomically: true, encoding: .utf8)
         }
     }
 }

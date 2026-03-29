@@ -4,56 +4,48 @@
 
 import SwiftUI
 
-enum OverlayMode {
-    case controls
-    case crtSettings
-    case audio
-    case basicScratchpad
-}
-
 struct OverlayContainerView: View {
     @Bindable var connection: C64Connection
     let onDismiss: () -> Void
-    @State private var mode: OverlayMode = .controls
 
     var body: some View {
         ZStack {
-            Color.black.opacity(mode == .crtSettings ? 0.0 : 0.4)
+            Color.black.opacity(connection.overlayMode == .crtSettings ? 0.0 : 0.4)
                 .onTapGesture { onDismiss() }
-                .animation(.easeInOut(duration: 0.2), value: mode)
+                .animation(.easeInOut(duration: 0.2), value: connection.overlayMode)
 
-            switch mode {
+            switch connection.overlayMode {
             case .controls:
                 ControlsOverlayView(
                     connection: connection,
-                    onCustomize: { mode = .crtSettings },
-                    onAudio: { mode = .audio },
-                    onBasicScratchpad: { mode = .basicScratchpad },
+                    onCustomize: { connection.overlayMode = .crtSettings },
+                    onAudio: { connection.overlayMode = .audio },
+                    onBasicScratchpad: { connection.overlayMode = .basicScratchpad },
                     onDismiss: onDismiss
                 )
             case .crtSettings:
                 CRTSettingsOverlayView(
                     connection: connection,
-                    onBack: { mode = .controls },
+                    onBack: { connection.overlayMode = .controls },
                     onDismiss: onDismiss
                 )
             case .audio:
                 AudioSettingsOverlayView(
                     connection: connection,
-                    onBack: { mode = .controls },
+                    onBack: { connection.overlayMode = .controls },
                     onDismiss: onDismiss
                 )
             case .basicScratchpad:
                 BASICScratchpadView(
                     connection: connection,
-                    onBack: { mode = .controls },
+                    onBack: { connection.overlayMode = .controls },
                     onDismiss: onDismiss
                 )
             }
         }
         .onKeyPress(.escape) {
-            if mode != .controls {
-                mode = .controls
+            if connection.overlayMode != .controls {
+                connection.overlayMode = .controls
             } else {
                 onDismiss()
             }

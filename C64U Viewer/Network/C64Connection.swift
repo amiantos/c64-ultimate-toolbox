@@ -40,6 +40,10 @@ final class C64Connection {
     }
     var isMuted = false
 
+    // Overlay state persisted across open/close
+    var overlayMode: OverlayMode = .controls
+    var basicScratchpadCode: String = BASICSamples.helloWorld
+
     private(set) var framesPerSecond: Double = 0
     private var frameCount = 0
     private var fpsTimer: DispatchSourceTimer?
@@ -191,6 +195,7 @@ final class C64Connection {
         connectionError = nil
         streamsActive = false
         isWaitingForReboot = false
+        overlayMode = .controls
         fpsTimer?.cancel()
         fpsTimer = nil
         framesPerSecond = 0
