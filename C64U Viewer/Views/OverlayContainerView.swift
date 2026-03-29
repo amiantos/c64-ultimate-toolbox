@@ -8,6 +8,7 @@ enum OverlayMode {
     case controls
     case crtSettings
     case audio
+    case basicScratchpad
 }
 
 struct OverlayContainerView: View {
@@ -27,6 +28,7 @@ struct OverlayContainerView: View {
                     connection: connection,
                     onCustomize: { mode = .crtSettings },
                     onAudio: { mode = .audio },
+                    onBasicScratchpad: { mode = .basicScratchpad },
                     onDismiss: onDismiss
                 )
             case .crtSettings:
@@ -37,6 +39,12 @@ struct OverlayContainerView: View {
                 )
             case .audio:
                 AudioSettingsOverlayView(
+                    connection: connection,
+                    onBack: { mode = .controls },
+                    onDismiss: onDismiss
+                )
+            case .basicScratchpad:
+                BASICScratchpadView(
                     connection: connection,
                     onBack: { mode = .controls },
                     onDismiss: onDismiss

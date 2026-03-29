@@ -9,6 +9,7 @@ struct ControlsOverlayView: View {
     @Bindable var connection: C64Connection
     let onCustomize: () -> Void
     let onAudio: () -> Void
+    let onBasicScratchpad: () -> Void
     let onDismiss: () -> Void
 
     @State private var showResetConfirm = false
@@ -203,6 +204,10 @@ struct ControlsOverlayView: View {
                         }
                         connection.runFile(type: type, data: data)
                     }
+                }
+
+                controlTile("BASIC", icon: "chevron.left.forwardslash.chevron.right", color: .cyan) {
+                    onBasicScratchpad()
                 }
 
                 controlTile("Menu", icon: "line.3.horizontal", color: .purple) {

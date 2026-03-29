@@ -13,6 +13,7 @@ struct C64U_ViewerApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(connection: connection)
+                .preferredColorScheme(.dark)
                 .alert("Save As New Preset", isPresented: $showingSaveAsAlert) {
                     TextField("Preset Name", text: $menuPresetName)
                     Button("Save") {
