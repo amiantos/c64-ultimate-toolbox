@@ -9,9 +9,19 @@ struct ContentView: View {
     @State var connection: C64Connection
     @State private var showCRTSettings = false
     @State private var showAudioSettings = false
+    @State private var showResetConfirm = false
+    @State private var showRebootConfirm = false
+    @State private var showPowerOffConfirm = false
+    @State private var showKeyboardInfo = false
+    @State private var columnVisibility: NavigationSplitViewVisibility = .doubleColumn
+    @State private var toolbarManager: ToolbarManager?
 
     private var keyboardActive: Bool {
         connection.keyboardForwarder?.isEnabled == true
+    }
+
+    private var isToolbox: Bool {
+        connection.connectionMode == .toolbox
     }
 
     var body: some View {
@@ -21,11 +31,13 @@ struct ContentView: View {
                 MetalView(renderer: connection.renderer)
                     .aspectRatio(CGFloat(384.0 / 272.0), contentMode: .fit)
                 HomeView(connection: connection)
+            } else if isToolbox {
+                toolboxView
             } else {
-                connectedView
+                viewerView
             }
 
-            // Settings modals (centered overlays)
+            // Settings modals
             if showCRTSettings {
                 settingsOverlay {
                     CRTSettingsOverlayView(
@@ -105,44 +117,108 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Connected View
+    // MARK: - Toolbox View
 
-    private var connectedView: some View {
-        VStack(spacing: 0) {
-            // Toolbar (Toolbox mode only)
-            if connection.connectionMode == .toolbox {
-                ToolboxToolbarView(
-                    connection: connection,
-                    onShowCRTSettings: { showCRTSettings = true },
-                    onShowAudioSettings: { showAudioSettings = true }
-                )
+    private var toolboxView: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            ControlSidebarView(connection: connection)
+        } detail: {
+            videoArea
+                .inspector(isPresented: inspectorPresented) {
+                    inspectorContent
+                        .inspectorColumnWidth(min: 280, ideal: 350, max: 500)
+                }
+        }
+        .onAppear { setupToolbar() }
+        .onDisappear { teardownToolbar() }
+        .confirmationDialog("Reset Machine?", isPresented: $showResetConfirm) {
+            Button("Reset", role: .destructive) { connection.machineAction(.reset) }
+        }
+        .confirmationDialog("Reboot Machine?", isPresented: $showRebootConfirm) {
+            Button("Reboot", role: .destructive) { connection.machineAction(.reboot) }
+        }
+        .confirmationDialog("Power Off Machine?", isPresented: $showPowerOffConfirm) {
+            Button("Power Off", role: .destructive) { connection.machineAction(.powerOff) }
+        }
+        .alert("Keyboard Forwarding", isPresented: $showKeyboardInfo) {
+            Button("Enable") {
+                UserDefaults.standard.set(true, forKey: "c64_keyboard_info_shown")
+                connection.keyboardForwarder?.isEnabled = true
             }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Keyboard input is forwarded to the C64 via the KERNAL keyboard buffer. This works with BASIC and programs that read input through the KERNAL, but does not work in the Ultimate menu or with most games that read the keyboard hardware directly.")
+        }
+    }
 
-            // Main content: video + optional tool panel
-            HStack(spacing: 0) {
-                // Video area
-                ZStack {
-                    Color.black
-                    MetalView(renderer: connection.renderer)
-                        .aspectRatio(CGFloat(384.0 / 272.0), contentMode: .fit)
+    // MARK: - Inspector
 
-                    VStack(spacing: 0) {
-                        Spacer()
+    private var inspectorPresented: Binding<Bool> {
+        Binding(
+            get: { connection.activeToolPanel != nil },
+            set: { if !$0 { connection.activeToolPanel = nil } }
+        )
+    }
 
-                        if keyboardActive, let forwarder = connection.keyboardForwarder {
-                            C64KeyStripView(forwarder: forwarder, connection: connection)
-                        }
+    @ViewBuilder
+    private var inspectorContent: some View {
+        switch connection.activeToolPanel {
+        case .basicScratchpad:
+            BASICScratchpadPanelView(connection: connection)
+        case .none:
+            EmptyView()
+        }
+    }
 
-                        StatusBarView(connection: connection, keyboardActive: keyboardActive)
-                    }
-                    .allowsHitTesting(keyboardActive)
+    // MARK: - Toolbar Setup
+
+    private func setupToolbar() {
+        let manager = ToolbarManager(connection: connection)
+        manager.onShowCRTSettings = { showCRTSettings = true }
+        manager.onShowAudioSettings = { showAudioSettings = true }
+        manager.onShowResetConfirm = { showResetConfirm = true }
+        manager.onShowRebootConfirm = { showRebootConfirm = true }
+        manager.onShowPowerOffConfirm = { showPowerOffConfirm = true }
+        manager.onShowKeyboardInfo = { showKeyboardInfo = true }
+        toolbarManager = manager
+
+        if let window = NSApplication.shared.windows.first {
+            manager.configureToolbar(for: window)
+        }
+    }
+
+    private func teardownToolbar() {
+        if let window = NSApplication.shared.windows.first {
+            toolbarManager?.removeToolbar(from: window)
+        }
+        toolbarManager = nil
+    }
+
+    // MARK: - Viewer View (clean, no sidebar)
+
+    private var viewerView: some View {
+        videoArea
+    }
+
+    // MARK: - Video Area
+
+    private var videoArea: some View {
+        ZStack {
+            Color.black
+
+            MetalView(renderer: connection.renderer)
+                .aspectRatio(CGFloat(384.0 / 272.0), contentMode: .fit)
+
+            VStack(spacing: 0) {
+                Spacer()
+
+                if keyboardActive, let forwarder = connection.keyboardForwarder {
+                    C64KeyStripView(forwarder: forwarder, connection: connection)
                 }
 
-                // Tool panel (right side)
-                if connection.connectionMode == .toolbox, connection.activeToolPanel != nil {
-                    ToolPanelContainer(connection: connection)
-                }
+                StatusBarView(connection: connection, keyboardActive: keyboardActive)
             }
+            .allowsHitTesting(keyboardActive)
         }
     }
 
@@ -163,4 +239,5 @@ struct ContentView: View {
             return .handled
         }
     }
+
 }

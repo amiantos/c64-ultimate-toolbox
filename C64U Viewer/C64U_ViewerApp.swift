@@ -31,6 +31,8 @@ struct C64U_ViewerApp: App {
         .windowResizability(.contentSize)
         .defaultSize(width: 768, height: 544)
         .commands {
+            InspectorCommands()
+
             CommandMenu("Stream") {
                 Button("Disconnect") {
                     connection.disconnect()

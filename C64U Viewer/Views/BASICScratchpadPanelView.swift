@@ -14,44 +14,54 @@ struct BASICScratchpadPanelView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-                .padding(.horizontal, 12)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
-
             BASICEditorView(text: $connection.basicScratchpadCode)
-                .padding(.horizontal, 12)
 
             if showSpecialCodes {
                 specialCodesReference
-                    .padding(.horizontal, 12)
-                    .padding(.top, 6)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 4)
             }
 
             statusBar
-                .padding(.horizontal, 12)
-                .padding(.top, 6)
-
-            toolbar
-                .padding(12)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
         }
-        .background(Color(nsColor: .controlBackgroundColor))
-    }
+        .navigationTitle("BASIC Scratchpad")
+        .toolbar {
+            ToolbarItemGroup(placement: .confirmationAction) {
+                Button {
+                    showSpecialCodes.toggle()
+                } label: {
+                    Image(systemName: "character.bubble")
+                }
+                .help(showSpecialCodes ? "Hide Special Codes" : "Show Special Codes")
 
-    // MARK: - Header
+                Menu {
+                    Menu("Samples") {
+                        ForEach(BASICSamples.all, id: \.name) { sample in
+                            Button(sample.name) {
+                                connection.basicScratchpadCode = sample.code
+                                errorMessage = nil
+                            }
+                        }
+                    }
+                    Divider()
+                    Button("Open...") { openFile() }
+                    Button("Save As...") { saveFile() }
+                } label: {
+                    Image(systemName: "doc")
+                }
+                .help("File")
 
-    private var header: some View {
-        HStack {
-            Text("BASIC Scratchpad")
-                .font(.headline)
-            Spacer()
-            Button {
-                connection.activeToolPanel = nil
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
+                Button {
+                    uploadProgram()
+                } label: {
+                    Image(systemName: "play.fill")
+                }
+                .help("Upload & Run")
+                .disabled(connection.basicScratchpadCode
+                    .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isUploading)
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -72,54 +82,6 @@ struct BASICScratchpadPanelView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-        }
-    }
-
-    // MARK: - Toolbar
-
-    private var toolbar: some View {
-        HStack(spacing: 8) {
-            Button {
-                showSpecialCodes.toggle()
-            } label: {
-                Label(showSpecialCodes ? "Hide Codes" : "Codes",
-                      systemImage: "character.bubble")
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-
-            Menu {
-                Menu("Samples") {
-                    ForEach(BASICSamples.all, id: \.name) { sample in
-                        Button(sample.name) {
-                            connection.basicScratchpadCode = sample.code
-                            errorMessage = nil
-                        }
-                    }
-                }
-                Divider()
-                Button("Open...") { openFile() }
-                Button("Save As...") { saveFile() }
-            } label: {
-                Label("File", systemImage: "doc")
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-
-            Spacer()
-
-            Button {
-                uploadProgram()
-            } label: {
-                if isUploading {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Label("Run", systemImage: "play.fill")
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
-            .disabled(connection.basicScratchpadCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isUploading)
         }
     }
 
@@ -164,7 +126,6 @@ struct BASICScratchpadPanelView: View {
                 let ptrData = Data([UInt8(endAddr & 0xFF), UInt8(endAddr >> 8)])
                 try await client.writeMem(address: 0x002D, data: ptrData)
 
-                // Auto-run
                 let runBytes: [UInt8] = [0x52, 0x55, 0x4E, 0x0D]
                 try await client.writeMem(address: 0x0277, data: Data(runBytes))
                 try await client.writeMem(address: 0x00C6, data: Data([UInt8(runBytes.count)]))

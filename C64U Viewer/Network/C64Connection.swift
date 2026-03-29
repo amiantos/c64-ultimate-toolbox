@@ -42,9 +42,6 @@ final class C64Connection {
 
     // Tool panel state
     var activeToolPanel: ToolPanelType? = nil
-    var toolPanelWidth: CGFloat = 320 {
-        didSet { UserDefaults.standard.set(toolPanelWidth, forKey: "c64_tool_panel_width") }
-    }
     var basicScratchpadCode: String = BASICSamples.helloWorld
 
     private(set) var framesPerSecond: Double = 0
@@ -85,10 +82,6 @@ final class C64Connection {
         if UserDefaults.standard.object(forKey: "c64_balance") != nil {
             balance = UserDefaults.standard.float(forKey: "c64_balance")
         }
-        if UserDefaults.standard.object(forKey: "c64_tool_panel_width") != nil {
-            toolPanelWidth = CGFloat(UserDefaults.standard.float(forKey: "c64_tool_panel_width"))
-        }
-
         // Load settings from preset manager
         crtSettings = presetManager.settings(for: presetManager.selectedIdentifier)
 
