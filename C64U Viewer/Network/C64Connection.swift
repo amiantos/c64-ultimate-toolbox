@@ -121,8 +121,11 @@ final class C64Connection {
 
     // MARK: - Toolbox Mode
 
-    func connectToolbox(ip: String, password: String?, savePassword: Bool) {
-        guard !isConnected else { return }
+    func connectToolbox(ip: String, password: String?, savePassword: Bool, completion: ((Bool) -> Void)? = nil) {
+        guard !isConnected else {
+            completion?(false)
+            return
+        }
 
         connectionMode = .toolbox
         connectionError = nil
@@ -145,6 +148,7 @@ final class C64Connection {
                 startFPSCounter()
                 recentConnections.addToolbox(ipAddress: ip, password: password, savePassword: savePassword)
                 startStreams()
+                completion?(true)
             } catch let error as C64APIError {
                 if case .httpError(403) = error {
                     self.connectionError = "Incorrect password"
@@ -154,11 +158,13 @@ final class C64Connection {
                 print("C64U API error: \(error.localizedDescription)")
                 apiClient = nil
                 connectionMode = nil
+                completion?(false)
             } catch {
                 self.connectionError = error.localizedDescription
                 print("C64U API error: \(error.localizedDescription)")
                 apiClient = nil
                 connectionMode = nil
+                completion?(false)
             }
         }
     }

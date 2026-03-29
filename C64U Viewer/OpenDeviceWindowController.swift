@@ -178,19 +178,15 @@ final class OpenDeviceWindowController: NSWindowController {
         connectToolboxButton.isEnabled = false
 
         let connection = C64Connection()
-        connection.connectToolbox(ip: ip, password: password, savePassword: savePassword)
-
-        // Wait briefly for connection result, then check
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+        connection.connectToolbox(ip: ip, password: password, savePassword: savePassword) { [weak self] success in
             guard let self else { return }
-            if connection.isConnected {
+            if success {
                 self.delegate?.openDeviceWindowController(self, didConnectWith: connection)
-                self.connectToolboxButton.isEnabled = true
             } else {
                 self.toolboxErrorLabel.stringValue = connection.connectionError ?? "Connection failed"
                 self.toolboxErrorLabel.isHidden = false
-                self.connectToolboxButton.isEnabled = true
             }
+            self.connectToolboxButton.isEnabled = true
         }
     }
 
