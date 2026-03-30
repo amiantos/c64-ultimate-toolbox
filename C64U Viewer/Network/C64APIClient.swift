@@ -52,6 +52,10 @@ final class C64APIClient: Sendable {
         try await post("/v1/runners:sidplay", body: data)
     }
 
+    func runMOD(data: Data) async throws {
+        try await post("/v1/runners:modplay", body: data)
+    }
+
     func runPRG(data: Data) async throws {
         try await post("/v1/runners:run_prg", body: data)
     }

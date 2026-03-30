@@ -4,6 +4,7 @@
 
 import CoreWLAN
 import Foundation
+import IOKit.pwr_mgt
 
 final class C64Connection {
     var videoPort: UInt16 = 11000
@@ -48,6 +49,7 @@ final class C64Connection {
     private(set) var framesPerSecond: Double = 0
     private var frameCount = 0
     private var fpsTimer: DispatchSourceTimer?
+    private var sleepAssertionID: IOPMAssertionID = 0
 
     let frameAssembler = FrameAssembler()
     let videoReceiver: UDPVideoReceiver
@@ -203,6 +205,7 @@ final class C64Connection {
         connectionError = nil
         streamsActive = false
         isWaitingForReboot = false
+        allowSleep()
         selectedSidebarItem = nil
         fpsTimer?.cancel()
         fpsTimer = nil
@@ -226,6 +229,7 @@ final class C64Connection {
                     try await client.startStream("audio", clientIP: localIP, port: audioPort)
                     self.streamsActive = true
                     self.connectionError = nil
+                    self.preventSleep()
                     completion?(true)
                 } else {
                     completion?(false)
@@ -249,6 +253,7 @@ final class C64Connection {
                 try await client.stopStream("audio")
                 self.streamsActive = false
                 self.connectionError = nil
+                self.allowSleep()
                 completion?(true)
             } catch {
                 print("C64U stream stop error: \(error.localizedDescription)")
@@ -264,6 +269,7 @@ final class C64Connection {
             do {
                 switch type {
                 case .sid: try await client.runSID(data: data)
+                case .mod: try await client.runMOD(data: data)
                 case .prg: try await client.runPRG(data: data)
                 case .crt: try await client.runCRT(data: data)
                 }
@@ -350,6 +356,24 @@ final class C64Connection {
         }
     }
 
+    // MARK: - Sleep Prevention
+
+    private func preventSleep() {
+        guard sleepAssertionID == 0 else { return }
+        IOPMAssertionCreateWithName(
+            kIOPMAssertionTypeNoDisplaySleep as CFString,
+            IOPMAssertionLevel(kIOPMAssertionLevelOn),
+            "C64 Ultimate Toolbox is streaming" as CFString,
+            &sleepAssertionID
+        )
+    }
+
+    private func allowSleep() {
+        guard sleepAssertionID != 0 else { return }
+        IOPMAssertionRelease(sleepAssertionID)
+        sleepAssertionID = 0
+    }
+
     // MARK: - Private
 
     private func startFPSCounter() {
@@ -408,7 +432,7 @@ final class C64Connection {
 }
 
 enum RunnerType {
-    case sid, prg, crt
+    case sid, mod, prg, crt
 }
 
 enum MachineAction: Equatable {

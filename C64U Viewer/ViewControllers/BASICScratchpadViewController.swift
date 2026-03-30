@@ -203,7 +203,7 @@ final class BASICScratchpadViewController: NSViewController {
     private func createSpecialCodesView() -> NSView {
         let flowView = FlowLayoutView()
         flowView.wantsLayer = true
-        flowView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.3).cgColor
+        flowView.layer?.backgroundColor = NSColor.textBackgroundColor.withAlphaComponent(0.1).cgColor
         flowView.spacing = 4
         flowView.padding = NSEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
 

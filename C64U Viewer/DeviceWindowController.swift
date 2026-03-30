@@ -309,13 +309,14 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
 
     @objc private func runFileTapped() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = ["sid", "prg", "crt"].compactMap { UTType(filenameExtension: $0) }
+        panel.allowedContentTypes = ["sid", "mod", "prg", "crt"].compactMap { UTType(filenameExtension: $0) }
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url,
            let data = try? Data(contentsOf: url) {
             let ext = url.pathExtension.lowercased()
             let type: RunnerType = switch ext {
             case "sid": .sid
+            case "mod": .mod
             case "crt": .crt
             default: .prg
             }

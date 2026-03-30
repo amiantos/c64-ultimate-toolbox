@@ -13,7 +13,7 @@ struct BASICSyntaxHighlighter {
     static let keywordColor = NSColor.systemBlue
     static let stringColor = NSColor.systemGreen
     static let numberColor = NSColor.systemOrange
-    static let lineNumberColor = NSColor.systemYellow
+    static let lineNumberColor = NSColor.systemBrown
     static let commentColor = NSColor.systemGray
     static let specialCodeColor = NSColor.systemPink
     static let errorColor = NSColor.systemRed
@@ -208,8 +208,8 @@ final class BASICEditorTextViewManager: NSObject, NSTextViewDelegate {
         tv.isAutomaticSpellingCorrectionEnabled = false
         tv.isAutomaticTextCompletionEnabled = false
         tv.font = BASICSyntaxHighlighter.defaultFont
-        tv.backgroundColor = NSColor(white: 0.1, alpha: 1.0)
-        tv.insertionPointColor = .white
+        tv.backgroundColor = NSColor.textBackgroundColor
+        tv.insertionPointColor = .textColor
         tv.textContainerInset = NSSize(width: 8, height: 8)
         tv.isHorizontallyResizable = true
         tv.textContainer?.widthTracksTextView = false
@@ -220,7 +220,7 @@ final class BASICEditorTextViewManager: NSObject, NSTextViewDelegate {
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.drawsBackground = true
-        scrollView.backgroundColor = NSColor(white: 0.1, alpha: 1.0)
+        scrollView.backgroundColor = NSColor.textBackgroundColor
         scrollView.borderType = .noBorder
 
         textView = tv
