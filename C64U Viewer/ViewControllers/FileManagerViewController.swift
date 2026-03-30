@@ -73,8 +73,10 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
             case 51: // Delete/Backspace
                 self.deleteSelected()
                 return nil
-            case 36: // Return/Enter — open folder or run file
-                self.doubleClickedRow()
+            case 36: // Return/Enter — rename (matches Finder behavior)
+                if self.selectedEntry() != nil {
+                    self.renameSelected()
+                }
                 return nil
             default:
                 return event
