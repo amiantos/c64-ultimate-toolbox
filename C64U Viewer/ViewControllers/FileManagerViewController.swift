@@ -35,6 +35,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         pathControl.pathStyle = .standard
         pathControl.isEditable = false
         pathControl.backgroundColor = .clear
+        pathControl.focusRingType = .none
         pathControl.translatesAutoresizingMaskIntoConstraints = false
         pathControl.target = self
         pathControl.action = #selector(pathClicked(_:))
