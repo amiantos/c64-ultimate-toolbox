@@ -39,10 +39,16 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         pathControl.target = self
         pathControl.action = #selector(pathClicked(_:))
 
+        // Separator between path bar and table
+        let topSeparator = NSBox()
+        topSeparator.boxType = .separator
+        topSeparator.translatesAutoresizingMaskIntoConstraints = false
+
         // Table view for file listing
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
 
         let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
@@ -59,6 +65,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         tableView.addTableColumn(sizeColumn)
 
         tableView.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        tableView.backgroundColor = .clear
         tableView.dataSource = self
         tableView.delegate = self
         tableView.rowSizeStyle = .default
@@ -107,8 +114,14 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         statusBar.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
         statusBar.translatesAutoresizingMaskIntoConstraints = false
 
+        let bottomSeparator = NSBox()
+        bottomSeparator.boxType = .separator
+        bottomSeparator.translatesAutoresizingMaskIntoConstraints = false
+
         container.addSubview(pathControl)
+        container.addSubview(topSeparator)
         container.addSubview(scrollView)
+        container.addSubview(bottomSeparator)
         container.addSubview(statusBar)
 
         NSLayoutConstraint.activate([
@@ -117,10 +130,18 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
             pathControl.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8),
             pathControl.heightAnchor.constraint(equalToConstant: 24),
 
-            scrollView.topAnchor.constraint(equalTo: pathControl.bottomAnchor, constant: 4),
+            topSeparator.topAnchor.constraint(equalTo: pathControl.bottomAnchor, constant: 4),
+            topSeparator.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            topSeparator.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+
+            scrollView.topAnchor.constraint(equalTo: topSeparator.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: statusBar.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomSeparator.topAnchor),
+
+            bottomSeparator.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            bottomSeparator.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            bottomSeparator.bottomAnchor.constraint(equalTo: statusBar.topAnchor),
 
             statusBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             statusBar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
