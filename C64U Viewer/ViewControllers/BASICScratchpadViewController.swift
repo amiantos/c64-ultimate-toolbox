@@ -18,10 +18,19 @@ final class BASICScratchpadViewController: NSViewController {
     private var statusBarToCodesConstraint: NSLayoutConstraint?
     private var isUploading = false
 
+    var isDirty: Bool {
+        connection.basicScratchpadCode != connection.basicScratchpadSavedContent
+    }
+
+    var currentFileURL: URL? {
+        get { connection.basicScratchpadFileURL }
+        set { connection.basicScratchpadFileURL = newValue }
+    }
+
     init(connection: C64Connection) {
         self.connection = connection
         super.init(nibName: nil, bundle: nil)
-        self.title = "BASIC Scratchpad"
+        updateTitle()
     }
 
     @available(*, unavailable)
@@ -76,11 +85,24 @@ final class BASICScratchpadViewController: NSViewController {
         editorManager.onTextChange = { [weak self] text in
             self?.connection.basicScratchpadCode = text
             self?.updateLineCount()
+            self?.updateTitle()
         }
         updateLineCount()
+        updateTitle()
     }
 
-    // MARK: - Line Count
+    // MARK: - Title & Status
+
+    func updateTitle() {
+        let filename = currentFileURL?.lastPathComponent ?? "Untitled"
+        let dirty = isDirty ? " *" : ""
+        title = "BASIC — \(filename)\(dirty)"
+
+        // Refresh the toolbar title item if we're in a window
+        if let dwc = view.window?.windowController as? DeviceWindowController {
+            dwc.refreshToolbarItem(.inspectorTitle)
+        }
+    }
 
     private func updateLineCount() {
         let count = connection.basicScratchpadCode
@@ -132,10 +154,16 @@ final class BASICScratchpadViewController: NSViewController {
     }
 
     func loadSample(_ sample: BASICSample) {
-        connection.basicScratchpadCode = sample.code
-        editorManager.setText(sample.code)
-        errorLabel.isHidden = true
-        updateLineCount()
+        promptIfDirty { [weak self] in
+            guard let self else { return }
+            self.connection.basicScratchpadCode = sample.code
+            self.connection.basicScratchpadSavedContent = sample.code
+            self.currentFileURL = nil
+            self.editorManager.setText(sample.code)
+            self.errorLabel.isHidden = true
+            self.updateLineCount()
+            self.updateTitle()
+        }
     }
 
     @objc func toggleSpecialCodes() {
@@ -215,28 +243,107 @@ final class BASICScratchpadViewController: NSViewController {
         }
     }
 
+    @objc func newFile() {
+        promptIfDirty { [weak self] in
+            guard let self else { return }
+            self.connection.basicScratchpadCode = ""
+            self.connection.basicScratchpadSavedContent = ""
+            self.currentFileURL = nil
+            self.editorManager.setText("")
+            self.errorLabel.isHidden = true
+            self.updateLineCount()
+            self.updateTitle()
+        }
+    }
+
     @objc func openFile() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [
-            UTType(filenameExtension: "bas"),
-            UTType.plainText,
-        ].compactMap { $0 }
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url,
-           let content = try? String(contentsOf: url, encoding: .utf8) {
-            connection.basicScratchpadCode = content
-            editorManager.setText(content)
-            errorLabel.isHidden = true
-            updateLineCount()
+        promptIfDirty { [weak self] in
+            guard let self else { return }
+            let panel = NSOpenPanel()
+            panel.allowedContentTypes = [
+                UTType(filenameExtension: "bas"),
+                UTType.plainText,
+            ].compactMap { $0 }
+            panel.allowsMultipleSelection = false
+            if panel.runModal() == .OK, let url = panel.url,
+               let content = try? String(contentsOf: url, encoding: .utf8) {
+                self.connection.basicScratchpadCode = content
+                self.connection.basicScratchpadSavedContent = content
+                self.currentFileURL = url
+                self.editorManager.setText(content)
+                self.errorLabel.isHidden = true
+                self.updateLineCount()
+                self.updateTitle()
+            }
         }
     }
 
     @objc func saveFile() {
+        if let url = currentFileURL {
+            // Save to existing file
+            do {
+                try connection.basicScratchpadCode.write(to: url, atomically: true, encoding: .utf8)
+                connection.basicScratchpadSavedContent = connection.basicScratchpadCode
+                updateTitle()
+            } catch {
+                errorLabel.stringValue = "Save failed: \(error.localizedDescription)"
+                errorLabel.isHidden = false
+            }
+        } else {
+            saveFileAs()
+        }
+    }
+
+    @objc func saveFileAs() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: "bas") ?? .plainText]
-        panel.nameFieldStringValue = "program.bas"
+        panel.nameFieldStringValue = currentFileURL?.lastPathComponent ?? "program.bas"
         if panel.runModal() == .OK, let url = panel.url {
-            try? connection.basicScratchpadCode.write(to: url, atomically: true, encoding: .utf8)
+            do {
+                try connection.basicScratchpadCode.write(to: url, atomically: true, encoding: .utf8)
+                currentFileURL = url
+                connection.basicScratchpadSavedContent = connection.basicScratchpadCode
+                updateTitle()
+            } catch {
+                errorLabel.stringValue = "Save failed: \(error.localizedDescription)"
+                errorLabel.isHidden = false
+            }
+        }
+    }
+
+    // MARK: - Dirty Check
+
+    func promptIfDirty(then action: @escaping () -> Void) {
+        guard isDirty else {
+            action()
+            return
+        }
+
+        let alert = NSAlert()
+        alert.messageText = "Save changes?"
+        alert.informativeText = "Your changes will be lost if you don't save them."
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Don't Save")
+        alert.addButton(withTitle: "Cancel")
+
+        guard let window = view.window else {
+            action()
+            return
+        }
+
+        alert.beginSheetModal(for: window) { [weak self] response in
+            switch response {
+            case .alertFirstButtonReturn:
+                // Save first, then proceed
+                self?.saveFile()
+                action()
+            case .alertSecondButtonReturn:
+                // Don't save, just proceed
+                action()
+            default:
+                // Cancel — do nothing
+                break
+            }
         }
     }
 

@@ -42,6 +42,8 @@ final class C64Connection {
     // Tool panel state
     var selectedSidebarItem: SidebarItem? = nil
     var basicScratchpadCode: String = BASICSamples.helloWorld
+    var basicScratchpadFileURL: URL? = nil
+    var basicScratchpadSavedContent: String = BASICSamples.helloWorld
 
     private(set) var framesPerSecond: Double = 0
     private var frameCount = 0

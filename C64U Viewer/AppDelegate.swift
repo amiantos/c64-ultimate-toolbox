@@ -35,7 +35,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, DeviceWindowController
         // File menu
         let fileMenuItem = NSMenuItem()
         let fileMenu = NSMenu(title: "File")
-        fileMenu.addItem(withTitle: "Open Device…", action: #selector(showOpenDeviceWindow), keyEquivalent: "o")
+        fileMenu.addItem(withTitle: "Open Device…", action: #selector(showOpenDeviceWindow), keyEquivalent: "O")
+        fileMenu.addItem(.separator())
+        fileMenu.addItem(withTitle: "New", action: #selector(DeviceWindowController.basicNewFile), keyEquivalent: "n")
+        fileMenu.addItem(withTitle: "Open…", action: #selector(DeviceWindowController.basicOpenFile), keyEquivalent: "o")
+        fileMenu.addItem(withTitle: "Save", action: #selector(DeviceWindowController.basicSaveFile), keyEquivalent: "s")
+        let saveAsItem = NSMenuItem(title: "Save As…", action: #selector(DeviceWindowController.basicSaveFileAs), keyEquivalent: "S")
+        fileMenu.addItem(saveAsItem)
         fileMenu.addItem(.separator())
         fileMenu.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         fileMenuItem.submenu = fileMenu

@@ -211,10 +211,14 @@ final class BASICEditorTextViewManager: NSObject, NSTextViewDelegate {
         tv.backgroundColor = NSColor(white: 0.1, alpha: 1.0)
         tv.insertionPointColor = .white
         tv.textContainerInset = NSSize(width: 8, height: 8)
+        tv.isHorizontallyResizable = true
+        tv.textContainer?.widthTracksTextView = false
+        tv.textContainer?.size.width = CGFloat.greatestFiniteMagnitude
+        tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         tv.delegate = self
 
         scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
+        scrollView.hasHorizontalScroller = true
         scrollView.drawsBackground = true
         scrollView.backgroundColor = NSColor(white: 0.1, alpha: 1.0)
         scrollView.borderType = .noBorder

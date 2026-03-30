@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+import Foundation
+
 enum SidebarItem: String, CaseIterable, Identifiable {
     // Settings
     case crtSettings
@@ -59,6 +61,17 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 
     var hasInspector: Bool {
         true
+    }
+
+    var preferredInspectorWidth: CGFloat {
+        switch self {
+        case .crtSettings: return 380
+        case .audioSettings: return 350
+        case .basicScratchpad: return 500
+        case .fileManager, .driveManagement, .diskFlipList, .configurationManager: return 450
+        case .memoryBrowser: return 500
+        case .debugStreamViewer: return 450
+        }
     }
 }
 

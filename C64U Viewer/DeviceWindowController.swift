@@ -109,6 +109,9 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
     // MARK: - Split View Setup
 
     private func setupSplitView() {
+        NotificationCenter.default.addObserver(self, selector: #selector(splitViewDidResize(_:)),
+                                               name: NSSplitView.didResizeSubviewsNotification,
+                                               object: splitViewController.splitView)
         // Sidebar (left) — only in Toolbox mode
         if connection.connectionMode == .toolbox {
             let sidebarVC = SidebarViewController(connection: connection)
@@ -155,6 +158,7 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
 
             // Close button first (far left of inspector area)
             items.append(.closeInspector)
+            items.append(.inspectorTitle)
 
             // Tool-specific items pushed right
             items.append(.flexibleSpace)
@@ -176,7 +180,7 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
             .flexibleSpace,
             .resetMachine, .rebootMachine, .powerOff, .menuButton,
             .inspectorTrackingSeparator,
-            .basicSpecialCodes, .basicFileMenu, .basicRun, .closeInspector,
+            .basicSpecialCodes, .basicFileMenu, .basicRun, .closeInspector, .inspectorTitle,
         ]
     }
 
@@ -218,6 +222,22 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
             item.showsIndicator = true
 
             let menu = NSMenu()
+
+            let newItem = NSMenuItem(title: "New", action: #selector(basicNewFile), keyEquivalent: "")
+            newItem.target = self
+            menu.addItem(newItem)
+            let openItem = NSMenuItem(title: "Open…", action: #selector(basicOpenFile), keyEquivalent: "")
+            openItem.target = self
+            menu.addItem(openItem)
+            menu.addItem(.separator())
+            let saveItem = NSMenuItem(title: "Save", action: #selector(basicSaveFile), keyEquivalent: "")
+            saveItem.target = self
+            menu.addItem(saveItem)
+            let saveAsItem = NSMenuItem(title: "Save As…", action: #selector(basicSaveFileAs), keyEquivalent: "")
+            saveAsItem.target = self
+            menu.addItem(saveAsItem)
+            menu.addItem(.separator())
+
             let samplesItem = NSMenuItem(title: "Samples", action: nil, keyEquivalent: "")
             let samplesMenu = NSMenu()
             for sample in BASICSamples.all {
@@ -228,17 +248,20 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
             }
             samplesItem.submenu = samplesMenu
             menu.addItem(samplesItem)
-            menu.addItem(.separator())
-            let openItem = NSMenuItem(title: "Open…", action: #selector(basicOpenFile), keyEquivalent: "")
-            openItem.target = self
-            menu.addItem(openItem)
-            let saveItem = NSMenuItem(title: "Save As…", action: #selector(basicSaveFile), keyEquivalent: "")
-            saveItem.target = self
-            menu.addItem(saveItem)
             item.menu = menu
             return item
         case .basicRun:
             return makeToolbarItem(itemIdentifier, label: "Run", icon: "play.fill", action: #selector(basicUploadAndRun))
+        case .inspectorTitle:
+            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+            let titleText = inspectorItem?.viewController.title ?? ""
+            let label = NSTextField(labelWithString: titleText)
+            label.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+            label.textColor = NSColor.secondaryLabelColor
+            label.sizeToFit()
+            item.view = label
+            item.label = ""
+            return item
         case .closeInspector:
             return makeToolbarItem(itemIdentifier, label: "Hide Inspector", icon: "sidebar.trailing", action: #selector(closeInspector))
         default:
@@ -363,12 +386,20 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
         basicScratchpadVC?.loadSample(sample)
     }
 
-    @objc private func basicOpenFile() {
+    @objc func basicNewFile() {
+        basicScratchpadVC?.newFile()
+    }
+
+    @objc func basicOpenFile() {
         basicScratchpadVC?.openFile()
     }
 
-    @objc private func basicSaveFile() {
+    @objc func basicSaveFile() {
         basicScratchpadVC?.saveFile()
+    }
+
+    @objc func basicSaveFileAs() {
+        basicScratchpadVC?.saveFileAs()
     }
 
     @objc private func basicUploadAndRun() {
@@ -376,8 +407,15 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
     }
 
     @objc private func closeInspector() {
-        closeCurrentInspector()
-        sidebarVC?.deselectAll()
+        if let vc = basicScratchpadVC, vc.isDirty {
+            vc.promptIfDirty { [weak self] in
+                self?.closeCurrentInspector()
+                self?.sidebarVC?.deselectAll()
+            }
+        } else {
+            closeCurrentInspector()
+            sidebarVC?.deselectAll()
+        }
     }
 
     private var sidebarVC: SidebarViewController? {
@@ -424,6 +462,16 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
 
     @objc func toggleRecording() {
         connection.toggleRecording()
+    }
+
+    // MARK: - Split View Resize Tracking
+
+    @objc private func splitViewDidResize(_ notification: Notification) {
+        guard let inspectorItem, let item = connection.selectedSidebarItem else { return }
+        let width = inspectorItem.viewController.view.frame.width
+        if width > 0 {
+            UserDefaults.standard.set(Double(width), forKey: "c64_inspector_width_\(item.rawValue)")
+        }
     }
 
     // MARK: - Helpers
@@ -489,12 +537,25 @@ extension DeviceWindowController: SidebarViewControllerDelegate {
             }
 
             let splitItem = NSSplitViewItem(inspectorWithViewController: viewController)
-            splitItem.minimumThickness = 280
-            splitItem.maximumThickness = 500
+            splitItem.minimumThickness = 350
+            splitItem.maximumThickness = 700
             splitItem.canCollapse = true
             splitItem.automaticallyAdjustsSafeAreaInsets = true
             splitViewController.addSplitViewItem(splitItem)
             inspectorItem = splitItem
+
+            // Restore saved inspector width per item, or use item's preferred default
+            let savedWidth = UserDefaults.standard.double(forKey: "c64_inspector_width_\(item.rawValue)")
+            let targetWidth = savedWidth > 0 ? CGFloat(savedWidth) : item.preferredInspectorWidth
+
+            // Set the divider position after layout
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let window = self.window else { return }
+                let dividerIndex = self.splitViewController.splitViewItems.count - 2
+                guard dividerIndex >= 0 else { return }
+                let position = window.frame.width - targetWidth
+                self.splitViewController.splitView.setPosition(position, ofDividerAt: dividerIndex)
+            }
         }
 
         rebuildToolbar()
@@ -516,4 +577,5 @@ extension NSToolbarItem.Identifier {
     static let basicFileMenu = NSToolbarItem.Identifier("basicFileMenu")
     static let basicRun = NSToolbarItem.Identifier("basicRun")
     static let closeInspector = NSToolbarItem.Identifier("closeInspector")
+    static let inspectorTitle = NSToolbarItem.Identifier("inspectorTitle")
 }
