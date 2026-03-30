@@ -7,6 +7,7 @@ import AppKit
 final class DisplayAudioViewController: NSViewController {
     let connection: C64Connection
     private var sliders: [String: NSSlider] = [:]
+    private var valueLabels: [String: NSTextField] = [:]
     private var presetPopup: NSPopUpButton!
     private var saveAsButton: NSButton!
     private var resetButton: NSButton!
@@ -203,7 +204,8 @@ final class DisplayAudioViewController: NSViewController {
         nameLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
         nameLabel.widthAnchor.constraint(equalToConstant: 100).isActive = true
 
-        let slider = NSSlider(value: Double(currentValue(for: key)),
+        let value = currentValue(for: key)
+        let slider = NSSlider(value: Double(value),
                               minValue: Double(range.lowerBound),
                               maxValue: Double(range.upperBound),
                               target: self,
@@ -212,8 +214,16 @@ final class DisplayAudioViewController: NSViewController {
         slider.controlSize = .small
         sliders[key] = slider
 
+        let valueLabel = NSTextField(labelWithString: formatSliderValue(value))
+        valueLabel.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular)
+        valueLabel.textColor = .secondaryLabelColor
+        valueLabel.alignment = .right
+        valueLabel.widthAnchor.constraint(equalToConstant: 36).isActive = true
+        valueLabels[key] = valueLabel
+
         row.addArrangedSubview(nameLabel)
         row.addArrangedSubview(slider)
+        row.addArrangedSubview(valueLabel)
         stack.addArrangedSubview(row)
         row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
     }
@@ -241,11 +251,19 @@ final class DisplayAudioViewController: NSViewController {
         }
     }
 
+    private func formatSliderValue(_ value: Float) -> String {
+        if abs(value) >= 10 {
+            return String(format: "%.1f", value)
+        }
+        return String(format: "%.2f", value)
+    }
+
     // MARK: - Actions
 
     @objc private func sliderChanged(_ sender: NSSlider) {
         guard let key = sender.identifier?.rawValue else { return }
         let value = Float(sender.doubleValue)
+        valueLabels[key]?.stringValue = formatSliderValue(value)
 
         // Audio sliders
         if key == "volume" {
@@ -341,7 +359,9 @@ final class DisplayAudioViewController: NSViewController {
 
     private func refreshSliders() {
         for (key, slider) in sliders {
-            slider.doubleValue = Double(currentValue(for: key))
+            let value = currentValue(for: key)
+            slider.doubleValue = Double(value)
+            valueLabels[key]?.stringValue = formatSliderValue(value)
         }
     }
 }

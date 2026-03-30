@@ -86,6 +86,10 @@ final class C64Connection {
         if UserDefaults.standard.object(forKey: "c64_balance") != nil {
             balance = UserDefaults.standard.float(forKey: "c64_balance")
         }
+        // Apply saved audio settings to audio player (didSet doesn't fire during init)
+        audioPlayer.volume = volume
+        audioPlayer.balance = balance
+
         // Load settings from preset manager
         crtSettings = presetManager.settings(for: presetManager.selectedIdentifier)
         renderer.crtSettings = crtSettings
