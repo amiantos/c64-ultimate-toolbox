@@ -120,8 +120,7 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
         if connection.connectionMode == .toolbox {
             let fileManagerVC = FileManagerViewController(connection: connection)
             let sidebarItem = NSSplitViewItem(sidebarWithViewController: fileManagerVC)
-            sidebarItem.minimumThickness = 200
-            sidebarItem.holdingPriority = .defaultHigh
+            sidebarItem.minimumThickness = 300
             splitViewController.addSplitViewItem(sidebarItem)
         }
 
@@ -135,8 +134,9 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
 
         // Debug panel (bottom) — created but collapsed by default
         let debugPanel = DebugPanelViewController(connection: connection)
+        debugPanel.view.setFrameSize(NSSize(width: debugPanel.view.frame.width, height: 335))
         let debugItem = NSSplitViewItem(viewController: debugPanel)
-        debugItem.minimumThickness = 150
+        debugItem.minimumThickness = 335
         debugItem.canCollapse = true
         debugItem.isCollapsed = true
         centerSplitViewController.addSplitViewItem(debugItem)
@@ -178,13 +178,15 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
         // Add inspector tracking separator when any inspector is open
         if inspectorItem != nil {
             items.append(.inspectorTrackingSeparator)
-            items.append(.closeInspector)
             items.append(.inspectorTitle)
-
             items.append(.flexibleSpace)
+
             if activeInspector == .basicScratchpad {
                 items.append(contentsOf: [.basicSpecialCodes, .basicFileMenu, .basicRun])
             }
+
+            items.append(.flexibleSpace)
+            items.append(.closeInspector)
         }
 
         return items
@@ -278,11 +280,13 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
             return makeToolbarItem(itemIdentifier, label: "Run", icon: "play.fill", action: #selector(basicUploadAndRun))
         case .toggleBasic:
             let isActive = activeInspector == .basicScratchpad
-            return makeToolbarItem(itemIdentifier, label: "BASIC", icon: isActive ? "chevron.left.forwardslash.chevron.right" : "chevron.left.forwardslash.chevron.right", action: #selector(toggleBasicInspector))
+            return makeToolbarItem(itemIdentifier, label: "BASIC", icon: isActive ? "curlybraces.square.fill" : "curlybraces.square", action: #selector(toggleBasicInspector))
         case .toggleSystem:
-            return makeToolbarItem(itemIdentifier, label: "System", icon: "gearshape", action: #selector(toggleSystemInspector))
+            let isActive = activeInspector == .system
+            return makeToolbarItem(itemIdentifier, label: "System", icon: isActive ? "gearshape.fill" : "gearshape", action: #selector(toggleSystemInspector))
         case .toggleDisplayAudio:
-            return makeToolbarItem(itemIdentifier, label: "Display & Audio", icon: "tv", action: #selector(toggleDisplayAudioInspector))
+            let isActive = activeInspector == .displayAndAudio
+            return makeToolbarItem(itemIdentifier, label: "Display & Audio", icon: isActive ? "tv.fill" : "tv", action: #selector(toggleDisplayAudioInspector))
         case .toggleDebugPanel:
             let isVisible = debugPanelItem?.isCollapsed == false
             return makeToolbarItem(itemIdentifier, label: "Debug", icon: isVisible ? "rectangle.bottomhalf.filled" : "rectangle.bottomhalf.inset.filled", action: #selector(toggleDebugPanel))
@@ -537,16 +541,6 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
         debugPanelItem.animator().isCollapsed.toggle()
 
         // Set initial height when opening
-        if !debugPanelItem.isCollapsed {
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                let totalHeight = self.centerSplitViewController.splitView.bounds.height
-                let debugHeight: CGFloat = 350
-                let dividerPosition = totalHeight - debugHeight
-                self.centerSplitViewController.splitView.setPosition(dividerPosition, ofDividerAt: 0)
-            }
-        }
-
         refreshToolbarItem(.toggleDebugPanel)
     }
 

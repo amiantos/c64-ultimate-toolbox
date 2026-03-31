@@ -79,14 +79,23 @@ final class MemoryBrowserViewController: NSViewController {
         presetMenu.action = #selector(presetSelected(_:))
         presetMenu.controlSize = .small
 
-        let addressRow = NSStackView(views: [addressLabel, addressField, goButton, presetMenu])
-        addressRow.orientation = .horizontal
-        addressRow.spacing = 4
-        addressRow.translatesAutoresizingMaskIntoConstraints = false
+        // Navigation buttons
+        let prevButton = NSButton(title: "◀", target: self, action: #selector(prevPage))
+        prevButton.bezelStyle = .rounded
+        prevButton.controlSize = .small
+        let nextButton = NSButton(title: "▶", target: self, action: #selector(nextPage))
+        nextButton.bezelStyle = .rounded
+        nextButton.controlSize = .small
+
+        let topRow = NSStackView(views: [prevButton, addressLabel, addressField, goButton, presetMenu, nextButton])
+        topRow.orientation = .horizontal
+        topRow.spacing = 4
+        topRow.translatesAutoresizingMaskIntoConstraints = false
 
         // Hex dump view
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
         scrollView.drawsBackground = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.documentView = hexView
@@ -121,19 +130,6 @@ final class MemoryBrowserViewController: NSViewController {
         bottomRow.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
         bottomRow.translatesAutoresizingMaskIntoConstraints = false
 
-        // Navigation buttons
-        let prevButton = NSButton(title: "◀ Prev", target: self, action: #selector(prevPage))
-        prevButton.bezelStyle = .rounded
-        prevButton.controlSize = .small
-        let nextButton = NSButton(title: "Next ▶", target: self, action: #selector(nextPage))
-        nextButton.bezelStyle = .rounded
-        nextButton.controlSize = .small
-
-        let navRow = NSStackView(views: [prevButton, NSView(), nextButton])
-        navRow.orientation = .horizontal
-        navRow.spacing = 8
-        navRow.translatesAutoresizingMaskIntoConstraints = false
-
         let topSeparator = NSBox()
         topSeparator.boxType = .separator
         topSeparator.translatesAutoresizingMaskIntoConstraints = false
@@ -142,23 +138,17 @@ final class MemoryBrowserViewController: NSViewController {
         bottomSeparator.boxType = .separator
         bottomSeparator.translatesAutoresizingMaskIntoConstraints = false
 
-        container.addSubview(addressRow)
-        container.addSubview(navRow)
+        container.addSubview(topRow)
         container.addSubview(topSeparator)
         container.addSubview(scrollView)
         container.addSubview(bottomSeparator)
         container.addSubview(bottomRow)
 
         NSLayoutConstraint.activate([
-            addressRow.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor, constant: 8),
-            addressRow.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
-            addressRow.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8),
+            topRow.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor, constant: 4),
+            topRow.centerXAnchor.constraint(equalTo: container.centerXAnchor),
 
-            navRow.topAnchor.constraint(equalTo: addressRow.bottomAnchor, constant: 4),
-            navRow.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
-            navRow.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8),
-
-            topSeparator.topAnchor.constraint(equalTo: navRow.bottomAnchor, constant: 4),
+            topSeparator.topAnchor.constraint(equalTo: topRow.bottomAnchor, constant: 4),
             topSeparator.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             topSeparator.trailingAnchor.constraint(equalTo: container.trailingAnchor),
 
@@ -342,7 +332,7 @@ final class HexDumpView: NSView {
         let rows = CGFloat((data.count + bytesPerRow - 1) / bytesPerRow)
         let height = max(rows * rowHeight + 4, 100)
         let width = addressWidth + CGFloat(bytesPerRow) * byteWidth + 12 + CGFloat(bytesPerRow) * charWidth + 20
-        frame = NSRect(x: 0, y: 0, width: max(width, superview?.bounds.width ?? width), height: height)
+        frame = NSRect(x: 0, y: 0, width: superview?.bounds.width ?? width, height: height)
         needsDisplay = true
     }
 

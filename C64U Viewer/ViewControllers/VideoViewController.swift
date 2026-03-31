@@ -25,7 +25,7 @@ final class VideoViewController: NSViewController {
     required init?(coder: NSCoder) { fatalError() }
 
     override func loadView() {
-        let container = NSView()
+        let container = ClickableView()
         container.wantsLayer = true
         container.layer?.backgroundColor = NSColor.black.cgColor
 
@@ -124,6 +124,17 @@ final class VideoViewController: NSViewController {
 
     deinit {
         statusTimer?.cancel()
+    }
+}
+
+/// A view that accepts first responder on click, allowing keyboard events
+/// to be handled by the DeviceWindow instead of other text views.
+private final class ClickableView: NSView {
+    override var acceptsFirstResponder: Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
+        super.mouseDown(with: event)
     }
 }
 

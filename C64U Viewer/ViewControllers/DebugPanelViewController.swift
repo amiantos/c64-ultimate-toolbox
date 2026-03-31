@@ -25,7 +25,7 @@ final class DebugPanelViewController: NSSplitViewController {
         let debugMonitor = DebugMonitorViewController(connection: connection)
 
         let memItem = NSSplitViewItem(viewController: memoryBrowser)
-        memItem.minimumThickness = 200
+        memItem.minimumThickness = 540
 
         let monItem = NSSplitViewItem(viewController: debugMonitor)
         monItem.minimumThickness = 200
@@ -34,12 +34,13 @@ final class DebugPanelViewController: NSSplitViewController {
         addSplitViewItem(monItem)
     }
 
-    override func viewDidAppear() {
-        super.viewDidAppear()
-        // Split 50/50
-        let totalWidth = splitView.bounds.width
-        if totalWidth > 0 {
-            splitView.setPosition(totalWidth / 2, ofDividerAt: 0)
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        if !hasSetInitialPosition {
+            hasSetInitialPosition = true
+            splitView.setPosition(540, ofDividerAt: 0)
         }
     }
+
+    private var hasSetInitialPosition = false
 }

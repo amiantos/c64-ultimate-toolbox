@@ -97,33 +97,13 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
 
         scrollView.documentView = tableView
 
-        // Status bar
-        statusLabel = NSTextField(labelWithString: "Connecting...")
-        statusLabel.font = .systemFont(ofSize: 11)
-        statusLabel.textColor = .secondaryLabelColor
-        statusLabel.translatesAutoresizingMaskIntoConstraints = false
-
+        // Status tracking (not displayed, but referenced for state)
+        statusLabel = NSTextField(labelWithString: "")
         progressIndicator = NSProgressIndicator()
-        progressIndicator.style = .bar
-        progressIndicator.isIndeterminate = false
-        progressIndicator.isHidden = true
-        progressIndicator.translatesAutoresizingMaskIntoConstraints = false
-
-        let statusBar = NSStackView(views: [statusLabel, progressIndicator])
-        statusBar.orientation = .horizontal
-        statusBar.spacing = 8
-        statusBar.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
-        statusBar.translatesAutoresizingMaskIntoConstraints = false
-
-        let bottomSeparator = NSBox()
-        bottomSeparator.boxType = .separator
-        bottomSeparator.translatesAutoresizingMaskIntoConstraints = false
 
         container.addSubview(pathControl)
         container.addSubview(topSeparator)
         container.addSubview(scrollView)
-        container.addSubview(bottomSeparator)
-        container.addSubview(statusBar)
 
         NSLayoutConstraint.activate([
             pathControl.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor, constant: 4),
@@ -138,18 +118,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
             scrollView.topAnchor.constraint(equalTo: topSeparator.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: bottomSeparator.topAnchor),
-
-            bottomSeparator.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            bottomSeparator.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            bottomSeparator.bottomAnchor.constraint(equalTo: statusBar.topAnchor),
-
-            statusBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            statusBar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            statusBar.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            statusBar.heightAnchor.constraint(equalToConstant: 28),
-
-            progressIndicator.widthAnchor.constraint(greaterThanOrEqualToConstant: 100),
+            scrollView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
         ])
 
         // Dynamic context menu
