@@ -11,7 +11,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 
     // Developer
     case memoryBrowser
-    case debugStreamViewer
+    case debugMonitor
 
     // Settings
     case system
@@ -24,7 +24,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .basicScratchpad: "BASIC Scratchpad"
         case .fileManager: "File Manager"
         case .memoryBrowser: "Memory Browser"
-        case .debugStreamViewer: "Debug Stream"
+        case .debugMonitor: "6510 Monitor"
         case .system: "System"
         case .displayAndAudio: "Display & Audio"
         }
@@ -35,7 +35,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .basicScratchpad: "chevron.left.forwardslash.chevron.right"
         case .fileManager: "folder"
         case .memoryBrowser: "memorychip"
-        case .debugStreamViewer: "ladybug"
+        case .debugMonitor: "ladybug"
         case .system: "gearshape"
         case .displayAndAudio: "tv"
         }
@@ -43,7 +43,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 
     var isImplemented: Bool {
         switch self {
-        case .basicScratchpad, .fileManager, .system, .displayAndAudio, .memoryBrowser:
+        case .basicScratchpad, .fileManager, .system, .displayAndAudio, .memoryBrowser, .debugMonitor:
             return true
         default:
             return false
@@ -61,7 +61,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .system: return 420
         case .displayAndAudio: return 400
         case .memoryBrowser: return 500
-        case .debugStreamViewer: return 450
+        case .debugMonitor: return 450
         }
     }
 }
@@ -75,6 +75,6 @@ struct SidebarSection {
 
 let sidebarSections: [SidebarSection] = [
     SidebarSection(title: "Tools", items: [.basicScratchpad, .fileManager]),
-    SidebarSection(title: "Developer", items: [.memoryBrowser]),
+    SidebarSection(title: "Developer", items: [.memoryBrowser, .debugMonitor]),
     SidebarSection(title: "Settings", items: [.system, .displayAndAudio]),
 ]

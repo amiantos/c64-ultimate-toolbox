@@ -583,6 +583,8 @@ extension DeviceWindowController: SidebarViewControllerDelegate {
                 viewController = FileManagerViewController(connection: connection)
             case .memoryBrowser:
                 viewController = MemoryBrowserViewController(connection: connection)
+            case .debugMonitor:
+                viewController = DebugMonitorViewController(connection: connection)
             default:
                 return // not yet implemented or no inspector
             }
