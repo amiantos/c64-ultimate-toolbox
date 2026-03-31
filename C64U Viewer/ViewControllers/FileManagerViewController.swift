@@ -36,6 +36,8 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         pathControl.isEditable = false
         pathControl.backgroundColor = .clear
         pathControl.focusRingType = .none
+        pathControl.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        pathControl.lineBreakMode = .byTruncatingMiddle
         pathControl.translatesAutoresizingMaskIntoConstraints = false
         pathControl.target = self
         pathControl.action = #selector(pathClicked(_:))
@@ -97,19 +99,42 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
 
         scrollView.documentView = tableView
 
-        // Status tracking (not displayed, but referenced for state)
-        statusLabel = NSTextField(labelWithString: "")
+        // Status bar
+        statusLabel = NSTextField(labelWithString: "Connecting...")
+        statusLabel.font = .systemFont(ofSize: 11)
+        statusLabel.textColor = .secondaryLabelColor
+        statusLabel.lineBreakMode = .byTruncatingMiddle
+        statusLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+
         progressIndicator = NSProgressIndicator()
+        progressIndicator.style = .bar
+        progressIndicator.isIndeterminate = false
+        progressIndicator.isHidden = true
+        progressIndicator.translatesAutoresizingMaskIntoConstraints = false
+
+        let bottomSeparator = NSBox()
+        bottomSeparator.boxType = .separator
+        bottomSeparator.translatesAutoresizingMaskIntoConstraints = false
+
+        let statusBar = NSStackView(views: [statusLabel, progressIndicator])
+        statusBar.orientation = .horizontal
+        statusBar.spacing = 8
+        statusBar.edgeInsets = NSEdgeInsets(top: 4, left: 16, bottom: 4, right: 8)
+        statusBar.translatesAutoresizingMaskIntoConstraints = false
 
         container.addSubview(pathControl)
         container.addSubview(topSeparator)
         container.addSubview(scrollView)
+        container.addSubview(bottomSeparator)
+        container.addSubview(statusBar)
 
         NSLayoutConstraint.activate([
             pathControl.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor, constant: 4),
             pathControl.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
-            pathControl.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8),
-            pathControl.heightAnchor.constraint(equalToConstant: 24),
+            pathControl.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -8),
+            pathControl.widthAnchor.constraint(lessThanOrEqualTo: container.widthAnchor, constant: -16),
+            pathControl.heightAnchor.constraint(equalToConstant: 18),
 
             topSeparator.topAnchor.constraint(equalTo: pathControl.bottomAnchor, constant: 4),
             topSeparator.leadingAnchor.constraint(equalTo: container.leadingAnchor),
@@ -118,7 +143,18 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
             scrollView.topAnchor.constraint(equalTo: topSeparator.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomSeparator.topAnchor),
+
+            bottomSeparator.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            bottomSeparator.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            bottomSeparator.bottomAnchor.constraint(equalTo: statusBar.topAnchor),
+
+            statusBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            statusBar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            statusBar.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            statusBar.heightAnchor.constraint(equalToConstant: 24),
+
+            progressIndicator.widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
         ])
 
         // Dynamic context menu
@@ -175,25 +211,21 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
             statusLabel.stringValue = "\(entries.count) item\(entries.count == 1 ? "" : "s")"
         } catch {
             print("[FileManager] Error: \(error)")
-            statusLabel.stringValue = "Error: \(error.localizedDescription)"
+            showError("Error", details: error.localizedDescription)
         }
     }
 
     private func updatePathControl() {
-        let components = currentPath.split(separator: "/")
+        let components = currentPath.split(separator: "/").map(String.init)
         var pathItems: [NSPathControlItem] = []
 
         let rootItem = NSPathControlItem()
         rootItem.title = "/"
-        rootItem.image = NSImage(systemSymbolName: "externaldrive.fill", accessibilityDescription: nil)
         pathItems.append(rootItem)
 
-        var accumulated = ""
         for component in components {
-            accumulated += "/\(component)"
             let item = NSPathControlItem()
-            item.title = String(component)
-            item.image = NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil)
+            item.title = component
             pathItems.append(item)
         }
 
@@ -461,7 +493,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                 statusLabel.stringValue = "Loading \(entry.name)"
 
             } catch {
-                statusLabel.stringValue = "Error: \(error.localizedDescription)"
+                showError("Error", details: error.localizedDescription)
             }
         }
     }
@@ -474,7 +506,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                 statusLabel.stringValue = "Mounted \(entry.name) on Drive A"
 
             } catch {
-                statusLabel.stringValue = "Error: \(error.localizedDescription)"
+                showError("Error", details: error.localizedDescription)
             }
         }
     }
@@ -487,7 +519,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                 statusLabel.stringValue = "Mounted \(entry.name) on Drive B"
 
             } catch {
-                statusLabel.stringValue = "Error: \(error.localizedDescription)"
+                showError("Error", details: error.localizedDescription)
             }
         }
     }
@@ -499,7 +531,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                 try await client.runPRGByPath(entry.path)
                 statusLabel.stringValue = "Running \(entry.name)"
             } catch {
-                statusLabel.stringValue = "Error: \(error.localizedDescription)"
+                showError("Error", details: error.localizedDescription)
             }
         }
     }
@@ -511,7 +543,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                 try await client.loadPRGByPath(entry.path)
                 statusLabel.stringValue = "Loaded \(entry.name)"
             } catch {
-                statusLabel.stringValue = "Error: \(error.localizedDescription)"
+                showError("Error", details: error.localizedDescription)
             }
         }
     }
@@ -523,7 +555,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                 try await client.playSIDByPath(entry.path)
                 statusLabel.stringValue = "Playing \(entry.name)"
             } catch {
-                statusLabel.stringValue = "Error: \(error.localizedDescription)"
+                showError("Error", details: error.localizedDescription)
             }
         }
     }
@@ -535,7 +567,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                 try await client.playMODByPath(entry.path)
                 statusLabel.stringValue = "Playing \(entry.name)"
             } catch {
-                statusLabel.stringValue = "Error: \(error.localizedDescription)"
+                showError("Error", details: error.localizedDescription)
             }
         }
     }
@@ -547,7 +579,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                 try await client.runCRTByPath(entry.path)
                 statusLabel.stringValue = "Running \(entry.name)"
             } catch {
-                statusLabel.stringValue = "Error: \(error.localizedDescription)"
+                showError("Error", details: error.localizedDescription)
             }
         }
     }
@@ -599,7 +631,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
 
                 statusLabel.stringValue = "Viewing \(entry.name)"
             } catch {
-                statusLabel.stringValue = "Error: \(error.localizedDescription)"
+                showError("Error", details: error.localizedDescription)
             }
         }
     }
@@ -708,7 +740,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                     try await self.ftpClient?.createDirectory(fullPath)
                     await self.navigateTo(self.currentPath)
                 } catch {
-                    self.statusLabel.stringValue = "Error: \(error.localizedDescription)"
+                    self.showError("Error", details: error.localizedDescription)
                 }
             }
         }
@@ -743,13 +775,17 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
             guard !destPath.isEmpty else { return }
 
             Task {
+                var errors: [String] = []
                 for entry in entriesToMove {
                     let newPath = destPath.hasSuffix("/") ? destPath + entry.name : destPath + "/" + entry.name
                     do {
                         try await self.ftpClient?.rename(from: entry.path, to: newPath)
                     } catch {
-                        self.statusLabel.stringValue = "Error moving \(entry.name): \(error.localizedDescription)"
+                        errors.append("\(entry.name): \(error.localizedDescription)")
                     }
+                }
+                if !errors.isEmpty {
+                    self.showError("Move Failed", details: errors.joined(separator: "\n"))
                 }
                 await self.navigateTo(self.currentPath)
             }
@@ -780,7 +816,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                     try await self.ftpClient?.rename(from: entry.path, to: newPath)
                     await self.navigateTo(self.currentPath)
                 } catch {
-                    self.statusLabel.stringValue = "Error: \(error.localizedDescription)"
+                    self.showError("Error", details: error.localizedDescription)
                 }
             }
         }
@@ -807,7 +843,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                             try await self.ftpClient?.deleteFile(entry.path)
                         }
                     } catch {
-                        self.statusLabel.stringValue = "Error deleting \(entry.name): \(error.localizedDescription)"
+                        self.showError("Delete Failed", details: "\(entry.name): \(error.localizedDescription)")
                     }
                 }
                 await self.navigateTo(self.currentPath)
@@ -831,6 +867,19 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
             guard row >= offset, (row - offset) < entries.count else { return nil }
             return entries[row - offset]
         }
+    }
+
+    private func showError(_ title: String, details: String) {
+        guard let window = view.window else {
+            print("[FileManager] Error: \(title) — \(details)")
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = details
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
+        alert.beginSheetModal(for: window)
     }
 
     private func formatFileSize(_ bytes: UInt64) -> String {
