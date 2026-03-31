@@ -430,6 +430,10 @@ extension DeviceWindowController: NSWindowDelegate {
         connection.disconnect()
         delegate?.deviceWindowDidClose(self)
     }
+
+    func window(_ window: NSWindow, willUseFullScreenPresentationOptions proposedOptions: NSApplication.PresentationOptions = []) -> NSApplication.PresentationOptions {
+        return proposedOptions.union([.autoHideToolbar, .autoHideMenuBar, .autoHideDock])
+    }
 }
 
 
