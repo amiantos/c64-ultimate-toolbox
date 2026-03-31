@@ -41,7 +41,6 @@ final class C64Connection {
     var isMuted = false
 
     // Tool panel state
-    var selectedSidebarItem: SidebarItem? = nil
     var basicScratchpadCode: String = BASICSamples.helloWorld
     var fileManagerCurrentPath: String = "/"
     var basicScratchpadFileURL: URL? = nil
@@ -211,7 +210,7 @@ final class C64Connection {
         streamsActive = false
         isWaitingForReboot = false
         allowSleep()
-        selectedSidebarItem = nil
+
         fpsTimer?.cancel()
         fpsTimer = nil
         framesPerSecond = 0

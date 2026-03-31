@@ -15,8 +15,11 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
     let connection: C64Connection
 
     private let splitViewController = NSSplitViewController()
+    private let centerSplitViewController = NSSplitViewController()
     private var videoViewController: VideoViewController!
     private var inspectorItem: NSSplitViewItem?
+    private var debugPanelItem: NSSplitViewItem?
+    private var activeInspector: InspectorPanel? = nil
 
     init(connection: C64Connection) {
         self.connection = connection
@@ -112,22 +115,36 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(splitViewDidResize(_:)),
                                                name: NSSplitView.didResizeSubviewsNotification,
                                                object: splitViewController.splitView)
-        // Sidebar (left) — only in Toolbox mode
+
+        // Sidebar (left) — File Manager in Toolbox mode
         if connection.connectionMode == .toolbox {
-            let sidebarVC = SidebarViewController(connection: connection)
-            sidebarVC.delegate = self
-            let sidebarItem = NSSplitViewItem(sidebarWithViewController: sidebarVC)
-            sidebarItem.minimumThickness = 180
-            // Set holding priority high so it doesn't auto-collapse on resize
+            let fileManagerVC = FileManagerViewController(connection: connection)
+            let sidebarItem = NSSplitViewItem(sidebarWithViewController: fileManagerVC)
+            sidebarItem.minimumThickness = 200
             sidebarItem.holdingPriority = .defaultHigh
             splitViewController.addSplitViewItem(sidebarItem)
         }
 
-        // Video (center) — always present
+        // Center area — vertical split: video (top) + debug panel (bottom, toggleable)
+        centerSplitViewController.splitView.isVertical = false
+
         videoViewController = VideoViewController(connection: connection)
         let videoItem = NSSplitViewItem(viewController: videoViewController)
-        videoItem.minimumThickness = 384
-        splitViewController.addSplitViewItem(videoItem)
+        videoItem.minimumThickness = 200
+        centerSplitViewController.addSplitViewItem(videoItem)
+
+        // Debug panel (bottom) — created but collapsed by default
+        let debugPanel = DebugPanelViewController(connection: connection)
+        let debugItem = NSSplitViewItem(viewController: debugPanel)
+        debugItem.minimumThickness = 150
+        debugItem.canCollapse = true
+        debugItem.isCollapsed = true
+        centerSplitViewController.addSplitViewItem(debugItem)
+        debugPanelItem = debugItem
+
+        let centerItem = NSSplitViewItem(viewController: centerSplitViewController)
+        centerItem.minimumThickness = 384
+        splitViewController.addSplitViewItem(centerItem)
     }
 
     // MARK: - Toolbar Setup
@@ -150,25 +167,23 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
             .startStopStreams, .runFile, .keyboard,
             .flexibleSpace,
             .pauseResume, .resetMachine, .rebootMachine, .powerOff,
+            .flexibleSpace,
+            // Inspector toggle buttons
+            .toggleBasic, .toggleSystem, .toggleDisplayAudio,
+            .flexibleSpace,
+            // Debug panel toggle
+            .toggleDebugPanel,
         ]
 
         // Add inspector tracking separator when any inspector is open
         if inspectorItem != nil {
             items.append(.inspectorTrackingSeparator)
-
-            // Close button first (far left of inspector area)
             items.append(.closeInspector)
             items.append(.inspectorTitle)
 
-            // Tool-specific items pushed right
             items.append(.flexibleSpace)
-            switch connection.selectedSidebarItem {
-            case .basicScratchpad:
+            if activeInspector == .basicScratchpad {
                 items.append(contentsOf: [.basicSpecialCodes, .basicFileMenu, .basicRun])
-            case .fileManager:
-                items.append(contentsOf: [.fmUpload, .fmNewFolder, .fmDelete, .fmRefresh])
-            default:
-                break
             }
         }
 
@@ -181,9 +196,10 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
             .startStopStreams, .runFile, .keyboard,
             .flexibleSpace,
             .pauseResume, .resetMachine, .rebootMachine, .powerOff,
+            .toggleBasic, .toggleSystem, .toggleDisplayAudio,
+            .toggleDebugPanel,
             .inspectorTrackingSeparator,
             .basicSpecialCodes, .basicFileMenu, .basicRun,
-            .fmUpload, .fmNewFolder, .fmDelete, .fmRefresh,
             .closeInspector, .inspectorTitle,
         ]
     }
@@ -260,14 +276,16 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
             return item
         case .basicRun:
             return makeToolbarItem(itemIdentifier, label: "Run", icon: "play.fill", action: #selector(basicUploadAndRun))
-        case .fmUpload:
-            return makeToolbarItem(itemIdentifier, label: "Upload", icon: "square.and.arrow.up", action: #selector(fmUpload))
-        case .fmNewFolder:
-            return makeToolbarItem(itemIdentifier, label: "New Folder", icon: "folder.badge.plus", action: #selector(fmNewFolder))
-        case .fmDelete:
-            return makeToolbarItem(itemIdentifier, label: "Delete", icon: "trash", action: #selector(fmDelete))
-        case .fmRefresh:
-            return makeToolbarItem(itemIdentifier, label: "Refresh", icon: "arrow.clockwise", action: #selector(fmRefresh))
+        case .toggleBasic:
+            let isActive = activeInspector == .basicScratchpad
+            return makeToolbarItem(itemIdentifier, label: "BASIC", icon: isActive ? "chevron.left.forwardslash.chevron.right" : "chevron.left.forwardslash.chevron.right", action: #selector(toggleBasicInspector))
+        case .toggleSystem:
+            return makeToolbarItem(itemIdentifier, label: "System", icon: "gearshape", action: #selector(toggleSystemInspector))
+        case .toggleDisplayAudio:
+            return makeToolbarItem(itemIdentifier, label: "Display & Audio", icon: "tv", action: #selector(toggleDisplayAudioInspector))
+        case .toggleDebugPanel:
+            let isVisible = debugPanelItem?.isCollapsed == false
+            return makeToolbarItem(itemIdentifier, label: "Debug", icon: isVisible ? "rectangle.bottomhalf.filled" : "rectangle.bottomhalf.inset.filled", action: #selector(toggleDebugPanel))
         case .inspectorTitle:
             let item = NSToolbarItem(itemIdentifier: itemIdentifier)
             let titleText = inspectorItem?.viewController.title ?? ""
@@ -431,42 +449,105 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
         basicScratchpadVC?.uploadAndRun()
     }
 
-    // MARK: - File Manager Toolbar Actions
+    // MARK: - Inspector Toggle Actions
 
-    private var fileManagerVC: FileManagerViewController? {
-        inspectorItem?.viewController as? FileManagerViewController
+    @objc private func toggleBasicInspector() { toggleInspector(.basicScratchpad) }
+    @objc private func toggleSystemInspector() { toggleInspector(.system) }
+    @objc private func toggleDisplayAudioInspector() { toggleInspector(.displayAndAudio) }
+
+    private func toggleInspector(_ panel: InspectorPanel) {
+        if activeInspector == panel {
+            // Close if already open
+            closeInspectorPanel()
+        } else {
+            // Close existing, open new
+            if let vc = basicScratchpadVC, vc.isDirty, activeInspector == .basicScratchpad {
+                vc.promptIfDirty { [weak self] in
+                    self?.openInspector(panel)
+                }
+            } else {
+                openInspector(panel)
+            }
+        }
     }
 
-    @objc private func fmUpload() {
-        fileManagerVC?.uploadFiles()
+    private func openInspector(_ panel: InspectorPanel) {
+        // Remove existing inspector
+        if let existing = inspectorItem {
+            splitViewController.removeSplitViewItem(existing)
+            inspectorItem = nil
+        }
+
+        let viewController: NSViewController
+        switch panel {
+        case .basicScratchpad:
+            viewController = BASICScratchpadViewController(connection: connection)
+        case .system:
+            viewController = SystemViewController(connection: connection)
+        case .displayAndAudio:
+            viewController = DisplayAudioViewController(connection: connection)
+        }
+
+        let splitItem = NSSplitViewItem(inspectorWithViewController: viewController)
+        splitItem.minimumThickness = 350
+        splitItem.maximumThickness = 700
+        splitItem.canCollapse = true
+        splitItem.automaticallyAdjustsSafeAreaInsets = true
+        splitViewController.addSplitViewItem(splitItem)
+        inspectorItem = splitItem
+        activeInspector = panel
+
+        // Restore saved width
+        let savedWidth = UserDefaults.standard.double(forKey: "c64_inspector_width_\(panel.rawValue)")
+        let targetWidth = savedWidth > 0 ? CGFloat(savedWidth) : panel.preferredWidth
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let window = self.window else { return }
+            let dividerIndex = self.splitViewController.splitViewItems.count - 2
+            guard dividerIndex >= 0 else { return }
+            let position = window.frame.width - targetWidth
+            self.splitViewController.splitView.setPosition(position, ofDividerAt: dividerIndex)
+        }
+
+        rebuildToolbar()
     }
 
-    @objc private func fmNewFolder() {
-        fileManagerVC?.createNewFolder()
-    }
-
-    @objc private func fmDelete() {
-        fileManagerVC?.deleteSelected()
-    }
-
-    @objc private func fmRefresh() {
-        fileManagerVC?.refreshDirectory()
+    private func closeInspectorPanel() {
+        if let existing = inspectorItem {
+            splitViewController.removeSplitViewItem(existing)
+            inspectorItem = nil
+        }
+        activeInspector = nil
+        rebuildToolbar()
     }
 
     @objc private func closeInspector() {
         if let vc = basicScratchpadVC, vc.isDirty {
             vc.promptIfDirty { [weak self] in
-                self?.closeCurrentInspector()
-                self?.sidebarVC?.deselectAll()
+                self?.closeInspectorPanel()
             }
         } else {
-            closeCurrentInspector()
-            sidebarVC?.deselectAll()
+            closeInspectorPanel()
         }
     }
 
-    private var sidebarVC: SidebarViewController? {
-        splitViewController.splitViewItems.first?.viewController as? SidebarViewController
+    // MARK: - Debug Panel Toggle
+
+    @objc private func toggleDebugPanel() {
+        guard let debugPanelItem else { return }
+        debugPanelItem.animator().isCollapsed.toggle()
+
+        // Set initial height when opening
+        if !debugPanelItem.isCollapsed {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                let totalHeight = self.centerSplitViewController.splitView.bounds.height
+                let debugHeight: CGFloat = 350
+                let dividerPosition = totalHeight - debugHeight
+                self.centerSplitViewController.splitView.setPosition(dividerPosition, ofDividerAt: 0)
+            }
+        }
+
+        refreshToolbarItem(.toggleDebugPanel)
     }
 
     // MARK: - Helpers
@@ -514,10 +595,10 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
     // MARK: - Split View Resize Tracking
 
     @objc private func splitViewDidResize(_ notification: Notification) {
-        guard let inspectorItem, let item = connection.selectedSidebarItem else { return }
+        guard let inspectorItem, let panel = activeInspector else { return }
         let width = inspectorItem.viewController.view.frame.width
         if width > 0 {
-            UserDefaults.standard.set(Double(width), forKey: "c64_inspector_width_\(item.rawValue)")
+            UserDefaults.standard.set(Double(width), forKey: "c64_inspector_width_\(panel.rawValue)")
         }
     }
 
@@ -548,72 +629,6 @@ extension DeviceWindowController: NSWindowDelegate {
     }
 }
 
-// MARK: - SidebarViewControllerDelegate
-
-extension DeviceWindowController: SidebarViewControllerDelegate {
-    func closeCurrentInspector() {
-        connection.selectedSidebarItem = nil
-        if let existing = inspectorItem {
-            splitViewController.removeSplitViewItem(existing)
-            inspectorItem = nil
-        }
-        rebuildToolbar()
-    }
-
-    func sidebarDidSelectItem(_ item: SidebarItem) {
-        connection.selectedSidebarItem = item
-
-        // Remove existing inspector if any
-        if let existing = inspectorItem {
-            splitViewController.removeSplitViewItem(existing)
-            inspectorItem = nil
-        }
-
-        // Add inspector for items that need one
-        if item.hasInspector && item.isImplemented {
-            let viewController: NSViewController
-            switch item {
-            case .system:
-                viewController = SystemViewController(connection: connection)
-            case .displayAndAudio:
-                viewController = DisplayAudioViewController(connection: connection)
-            case .basicScratchpad:
-                viewController = BASICScratchpadViewController(connection: connection)
-            case .fileManager:
-                viewController = FileManagerViewController(connection: connection)
-            case .memoryBrowser:
-                viewController = MemoryBrowserViewController(connection: connection)
-            case .debugMonitor:
-                viewController = DebugMonitorViewController(connection: connection)
-            default:
-                return // not yet implemented or no inspector
-            }
-
-            let splitItem = NSSplitViewItem(inspectorWithViewController: viewController)
-            splitItem.minimumThickness = 350
-            splitItem.maximumThickness = 700
-            splitItem.canCollapse = true
-            splitItem.automaticallyAdjustsSafeAreaInsets = true
-            splitViewController.addSplitViewItem(splitItem)
-            inspectorItem = splitItem
-
-            // Restore saved inspector width per item, or use item's preferred default
-            let savedWidth = UserDefaults.standard.double(forKey: "c64_inspector_width_\(item.rawValue)")
-            let targetWidth = savedWidth > 0 ? CGFloat(savedWidth) : item.preferredInspectorWidth
-
-            // Set the divider position after layout
-            DispatchQueue.main.async { [weak self] in
-                guard let self, let window = self.window else { return }
-                let dividerIndex = self.splitViewController.splitViewItems.count - 2
-                guard dividerIndex >= 0 else { return }
-                let position = window.frame.width - targetWidth
-                self.splitViewController.splitView.setPosition(position, ofDividerAt: dividerIndex)
-            }
-        }
-
-        rebuildToolbar()
-    }
-}
 
 // MARK: - Toolbar Item Identifiers
 
@@ -629,10 +644,10 @@ extension NSToolbarItem.Identifier {
     static let basicSpecialCodes = NSToolbarItem.Identifier("basicSpecialCodes")
     static let basicFileMenu = NSToolbarItem.Identifier("basicFileMenu")
     static let basicRun = NSToolbarItem.Identifier("basicRun")
-    static let fmUpload = NSToolbarItem.Identifier("fmUpload")
-    static let fmNewFolder = NSToolbarItem.Identifier("fmNewFolder")
-    static let fmDelete = NSToolbarItem.Identifier("fmDelete")
-    static let fmRefresh = NSToolbarItem.Identifier("fmRefresh")
+    static let toggleBasic = NSToolbarItem.Identifier("toggleBasic")
+    static let toggleSystem = NSToolbarItem.Identifier("toggleSystem")
+    static let toggleDisplayAudio = NSToolbarItem.Identifier("toggleDisplayAudio")
+    static let toggleDebugPanel = NSToolbarItem.Identifier("toggleDebugPanel")
     static let closeInspector = NSToolbarItem.Identifier("closeInspector")
     static let inspectorTitle = NSToolbarItem.Identifier("inspectorTitle")
 }
