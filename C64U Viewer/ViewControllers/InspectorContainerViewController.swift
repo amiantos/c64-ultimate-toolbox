@@ -80,6 +80,13 @@ final class InspectorContainerViewController: NSViewController {
 
         self.view = container
 
+        // Viewer mode: remove segmented control, only show Display & Audio
+        if connection.connectionMode == .viewer {
+            segmentedControl.removeFromSuperview()
+            actionBar.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor, constant: 4).isActive = true
+            activePanel = .displayAndAudio
+        }
+
         showPanel(activePanel)
     }
 

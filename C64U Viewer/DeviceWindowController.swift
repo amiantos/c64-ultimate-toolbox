@@ -146,24 +146,20 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
         splitViewController.addSplitViewItem(centerItem)
 
         // Inspector (right) — persistent, starts collapsed
-        if connection.connectionMode == .toolbox {
-            let inspectorContainer = InspectorContainerViewController(connection: connection)
-            let item = NSSplitViewItem(inspectorWithViewController: inspectorContainer)
-            item.minimumThickness = 350
-            item.maximumThickness = 700
-            item.canCollapse = true
-            item.isCollapsed = true
-            item.automaticallyAdjustsSafeAreaInsets = true
-            splitViewController.addSplitViewItem(item)
-            inspectorItem = item
-        }
+        let inspectorContainer = InspectorContainerViewController(connection: connection)
+        let inspItem = NSSplitViewItem(inspectorWithViewController: inspectorContainer)
+        inspItem.minimumThickness = 350
+        inspItem.maximumThickness = 700
+        inspItem.canCollapse = true
+        inspItem.isCollapsed = true
+        inspItem.automaticallyAdjustsSafeAreaInsets = true
+        splitViewController.addSplitViewItem(inspItem)
+        inspectorItem = inspItem
     }
 
     // MARK: - Toolbar Setup
 
     private func setupToolbar() {
-        guard connection.connectionMode == .toolbox else { return }
-
         let toolbar = NSToolbar(identifier: "DeviceToolbar")
         toolbar.displayMode = .iconOnly
         toolbar.delegate = self
@@ -173,18 +169,27 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
     // MARK: - NSToolbarDelegate
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [
-            .toggleSidebar,
-            .sidebarTrackingSeparator,
-            .startStopStreams, .runFile, .keyboard,
-            .flexibleSpace,
-            .pauseResume, .resetMachine, .rebootMachine, .powerOff,
-            .flexibleSpace,
-            .toggleDebugPanel,
+        var items: [NSToolbarItem.Identifier] = []
+
+        if connection.connectionMode == .toolbox {
+            items.append(contentsOf: [
+                .toggleSidebar,
+                .sidebarTrackingSeparator,
+                .startStopStreams, .runFile, .keyboard,
+                .flexibleSpace,
+                .pauseResume, .resetMachine, .rebootMachine, .powerOff,
+                .flexibleSpace,
+                .toggleDebugPanel,
+            ])
+        }
+
+        items.append(contentsOf: [
             .inspectorTrackingSeparator,
             .flexibleSpace,
             .toggleInspector,
-        ]
+        ])
+
+        return items
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
