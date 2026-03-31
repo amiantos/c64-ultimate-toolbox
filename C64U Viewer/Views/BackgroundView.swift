@@ -17,3 +17,17 @@ final class BackgroundView: NSView {
         dirtyRect.fill()
     }
 }
+
+/// Same as BackgroundView but with flipped coordinate system (origin at top-left).
+final class FlippedBackgroundView: NSView {
+    var backgroundColor: NSColor = .controlBackgroundColor {
+        didSet { needsDisplay = true }
+    }
+
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        backgroundColor.setFill()
+        dirtyRect.fill()
+    }
+}

@@ -19,7 +19,6 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
     private var videoViewController: VideoViewController!
     private var inspectorItem: NSSplitViewItem?
     private var debugPanelItem: NSSplitViewItem?
-    private var activeInspector: InspectorPanel? = nil
 
     init(connection: C64Connection) {
         self.connection = connection
@@ -145,6 +144,19 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
         let centerItem = NSSplitViewItem(viewController: centerSplitViewController)
         centerItem.minimumThickness = 384
         splitViewController.addSplitViewItem(centerItem)
+
+        // Inspector (right) — persistent, starts collapsed
+        if connection.connectionMode == .toolbox {
+            let inspectorContainer = InspectorContainerViewController(connection: connection)
+            let item = NSSplitViewItem(inspectorWithViewController: inspectorContainer)
+            item.minimumThickness = 350
+            item.maximumThickness = 700
+            item.canCollapse = true
+            item.isCollapsed = true
+            item.automaticallyAdjustsSafeAreaInsets = true
+            splitViewController.addSplitViewItem(item)
+            inspectorItem = item
+        }
     }
 
     // MARK: - Toolbar Setup
@@ -161,35 +173,18 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
     // MARK: - NSToolbarDelegate
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        var items: [NSToolbarItem.Identifier] = [
+        [
             .toggleSidebar,
             .sidebarTrackingSeparator,
             .startStopStreams, .runFile, .keyboard,
             .flexibleSpace,
             .pauseResume, .resetMachine, .rebootMachine, .powerOff,
             .flexibleSpace,
-            // Inspector toggle buttons
-            .toggleBasic, .toggleSystem, .toggleDisplayAudio,
-            .flexibleSpace,
-            // Debug panel toggle
             .toggleDebugPanel,
+            .inspectorTrackingSeparator,
+            .flexibleSpace,
+            .toggleInspector,
         ]
-
-        // Add inspector tracking separator when any inspector is open
-        if inspectorItem != nil {
-            items.append(.inspectorTrackingSeparator)
-            items.append(.inspectorTitle)
-            items.append(.flexibleSpace)
-
-            if activeInspector == .basicScratchpad {
-                items.append(contentsOf: [.basicSpecialCodes, .basicFileMenu, .basicRun])
-            }
-
-            items.append(.flexibleSpace)
-            items.append(.closeInspector)
-        }
-
-        return items
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -198,11 +193,7 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
             .startStopStreams, .runFile, .keyboard,
             .flexibleSpace,
             .pauseResume, .resetMachine, .rebootMachine, .powerOff,
-            .toggleBasic, .toggleSystem, .toggleDisplayAudio,
-            .toggleDebugPanel,
-            .inspectorTrackingSeparator,
-            .basicSpecialCodes, .basicFileMenu, .basicRun,
-            .closeInspector, .inspectorTitle,
+            .toggleDebugPanel, .inspectorTrackingSeparator, .toggleInspector,
         ]
     }
 
@@ -211,7 +202,6 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
         case .inspectorTrackingSeparator:
             let dividerIndex = splitViewController.splitViewItems.count - 2
             return NSTrackingSeparatorToolbarItem(identifier: itemIdentifier, splitView: splitViewController.splitView, dividerIndex: max(0, dividerIndex))
-
         case .startStopStreams:
             if connection.streamsActive {
                 return makeToolbarItem(itemIdentifier, label: "Stop Streams", icon: "stop.circle.fill", action: #selector(stopStreams))
@@ -235,73 +225,12 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
             } else {
                 return makeToolbarItem(itemIdentifier, label: "Pause", icon: "pause", action: #selector(pauseMachine))
             }
-        case .basicSpecialCodes:
-            let isOn = basicScratchpadVC?.isSpecialCodesVisible == true
-            return makeToolbarItem(itemIdentifier, label: "Special Codes", icon: isOn ? "character.bubble.fill" : "character.bubble", action: #selector(basicToggleSpecialCodes))
-        case .basicFileMenu:
-            let item = NSMenuToolbarItem(itemIdentifier: itemIdentifier)
-            item.label = "File"
-            item.toolTip = "File"
-            if let image = NSImage(systemSymbolName: "doc", accessibilityDescription: "File") {
-                item.image = image
-            }
-            item.showsIndicator = true
-
-            let menu = NSMenu()
-
-            let newItem = NSMenuItem(title: "New", action: #selector(basicNewFile), keyEquivalent: "")
-            newItem.target = self
-            menu.addItem(newItem)
-            let openItem = NSMenuItem(title: "Open…", action: #selector(basicOpenFile), keyEquivalent: "")
-            openItem.target = self
-            menu.addItem(openItem)
-            menu.addItem(.separator())
-            let saveItem = NSMenuItem(title: "Save", action: #selector(basicSaveFile), keyEquivalent: "")
-            saveItem.target = self
-            menu.addItem(saveItem)
-            let saveAsItem = NSMenuItem(title: "Save As…", action: #selector(basicSaveFileAs), keyEquivalent: "")
-            saveAsItem.target = self
-            menu.addItem(saveAsItem)
-            menu.addItem(.separator())
-
-            let samplesItem = NSMenuItem(title: "Samples", action: nil, keyEquivalent: "")
-            let samplesMenu = NSMenu()
-            for sample in BASICSamples.all {
-                let menuItem = NSMenuItem(title: sample.name, action: #selector(basicLoadSample(_:)), keyEquivalent: "")
-                menuItem.target = self
-                menuItem.representedObject = sample
-                samplesMenu.addItem(menuItem)
-            }
-            samplesItem.submenu = samplesMenu
-            menu.addItem(samplesItem)
-            item.menu = menu
-            return item
-        case .basicRun:
-            return makeToolbarItem(itemIdentifier, label: "Run", icon: "play.fill", action: #selector(basicUploadAndRun))
-        case .toggleBasic:
-            let isActive = activeInspector == .basicScratchpad
-            return makeToolbarItem(itemIdentifier, label: "BASIC", icon: isActive ? "curlybraces.square.fill" : "curlybraces.square", action: #selector(toggleBasicInspector))
-        case .toggleSystem:
-            let isActive = activeInspector == .system
-            return makeToolbarItem(itemIdentifier, label: "System", icon: isActive ? "gearshape.fill" : "gearshape", action: #selector(toggleSystemInspector))
-        case .toggleDisplayAudio:
-            let isActive = activeInspector == .displayAndAudio
-            return makeToolbarItem(itemIdentifier, label: "Display & Audio", icon: isActive ? "tv.fill" : "tv", action: #selector(toggleDisplayAudioInspector))
         case .toggleDebugPanel:
             let isVisible = debugPanelItem?.isCollapsed == false
             return makeToolbarItem(itemIdentifier, label: "Debug", icon: isVisible ? "rectangle.bottomhalf.filled" : "rectangle.bottomhalf.inset.filled", action: #selector(toggleDebugPanel))
-        case .inspectorTitle:
-            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-            let titleText = inspectorItem?.viewController.title ?? ""
-            let label = NSTextField(labelWithString: titleText)
-            label.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-            label.textColor = NSColor.secondaryLabelColor
-            label.sizeToFit()
-            item.view = label
-            item.label = ""
-            return item
-        case .closeInspector:
-            return makeToolbarItem(itemIdentifier, label: "Hide Inspector", icon: "sidebar.trailing", action: #selector(closeInspector))
+        case .toggleInspector:
+            let isVisible = inspectorItem?.isCollapsed == false
+            return makeToolbarItem(itemIdentifier, label: "Inspector", icon: isVisible ? "sidebar.trailing" : "sidebar.trailing", action: #selector(toggleInspector))
         default:
             return nil
         }
@@ -412,126 +341,11 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
         }
     }
 
-    // MARK: - BASIC Inspector Toolbar Actions
+    // MARK: - Inspector Toggle
 
-    private var basicScratchpadVC: BASICScratchpadViewController? {
-        inspectorItem?.viewController as? BASICScratchpadViewController
-    }
-
-    @objc private func basicToggleSpecialCodes() {
-        basicScratchpadVC?.toggleSpecialCodes()
-        refreshToolbarItem(.basicSpecialCodes)
-    }
-
-    @objc private func basicShowFileMenu(_ sender: Any?) {
-        // The file menu is handled through individual menu items
-        basicScratchpadVC?.showFileMenu(from: sender)
-    }
-
-    @objc private func basicLoadSample(_ sender: NSMenuItem) {
-        guard let sample = sender.representedObject as? BASICSample else { return }
-        basicScratchpadVC?.loadSample(sample)
-    }
-
-    @objc func basicNewFile() {
-        basicScratchpadVC?.newFile()
-    }
-
-    @objc func basicOpenFile() {
-        basicScratchpadVC?.openFile()
-    }
-
-    @objc func basicSaveFile() {
-        basicScratchpadVC?.saveFile()
-    }
-
-    @objc func basicSaveFileAs() {
-        basicScratchpadVC?.saveFileAs()
-    }
-
-    @objc private func basicUploadAndRun() {
-        basicScratchpadVC?.uploadAndRun()
-    }
-
-    // MARK: - Inspector Toggle Actions
-
-    @objc private func toggleBasicInspector() { toggleInspector(.basicScratchpad) }
-    @objc private func toggleSystemInspector() { toggleInspector(.system) }
-    @objc private func toggleDisplayAudioInspector() { toggleInspector(.displayAndAudio) }
-
-    private func toggleInspector(_ panel: InspectorPanel) {
-        if activeInspector == panel {
-            // Close if already open
-            closeInspectorPanel()
-        } else {
-            // Close existing, open new
-            if let vc = basicScratchpadVC, vc.isDirty, activeInspector == .basicScratchpad {
-                vc.promptIfDirty { [weak self] in
-                    self?.openInspector(panel)
-                }
-            } else {
-                openInspector(panel)
-            }
-        }
-    }
-
-    private func openInspector(_ panel: InspectorPanel) {
-        // Remove existing inspector
-        if let existing = inspectorItem {
-            splitViewController.removeSplitViewItem(existing)
-            inspectorItem = nil
-        }
-
-        let viewController: NSViewController
-        switch panel {
-        case .basicScratchpad:
-            viewController = BASICScratchpadViewController(connection: connection)
-        case .system:
-            viewController = SystemViewController(connection: connection)
-        case .displayAndAudio:
-            viewController = DisplayAudioViewController(connection: connection)
-        }
-
-        let splitItem = NSSplitViewItem(inspectorWithViewController: viewController)
-        splitItem.minimumThickness = 350
-        splitItem.maximumThickness = 700
-        splitItem.canCollapse = true
-        splitItem.automaticallyAdjustsSafeAreaInsets = true
-        splitViewController.addSplitViewItem(splitItem)
-        inspectorItem = splitItem
-        activeInspector = panel
-
-        // Restore saved width
-        let savedWidth = UserDefaults.standard.double(forKey: "c64_inspector_width_\(panel.rawValue)")
-        let targetWidth = savedWidth > 0 ? CGFloat(savedWidth) : panel.preferredWidth
-        DispatchQueue.main.async { [weak self] in
-            guard let self, let window = self.window else { return }
-            let dividerIndex = self.splitViewController.splitViewItems.count - 2
-            guard dividerIndex >= 0 else { return }
-            let position = window.frame.width - targetWidth
-            self.splitViewController.splitView.setPosition(position, ofDividerAt: dividerIndex)
-        }
-
-        rebuildToolbar()
-    }
-
-    private func closeInspectorPanel() {
-        if let existing = inspectorItem {
-            splitViewController.removeSplitViewItem(existing)
-            inspectorItem = nil
-        }
-        activeInspector = nil
-        rebuildToolbar()
-    }
-
-    @objc private func closeInspector() {
-        if let vc = basicScratchpadVC, vc.isDirty {
-            vc.promptIfDirty { [weak self] in
-                self?.closeInspectorPanel()
-            }
-        } else {
-            closeInspectorPanel()
-        }
+    @objc private func toggleInspector() {
+        guard let inspectorItem else { return }
+        inspectorItem.animator().isCollapsed.toggle()
     }
 
     // MARK: - Debug Panel Toggle
@@ -546,16 +360,6 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
 
     // MARK: - Helpers
 
-    private func rebuildToolbar() {
-        guard let toolbar = window?.toolbar else { return }
-        // Remove all items and re-add from default identifiers
-        while toolbar.items.count > 0 {
-            toolbar.removeItem(at: 0)
-        }
-        for identifier in toolbarDefaultItemIdentifiers(toolbar) {
-            toolbar.insertItem(withItemIdentifier: identifier, at: toolbar.items.count)
-        }
-    }
 
     // MARK: - Menu Actions
 
@@ -589,10 +393,10 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
     // MARK: - Split View Resize Tracking
 
     @objc private func splitViewDidResize(_ notification: Notification) {
-        guard let inspectorItem, let panel = activeInspector else { return }
+        guard let inspectorItem else { return }
         let width = inspectorItem.viewController.view.frame.width
         if width > 0 {
-            UserDefaults.standard.set(Double(width), forKey: "c64_inspector_width_\(panel.rawValue)")
+            UserDefaults.standard.set(Double(width), forKey: "c64_inspector_width")
         }
     }
 
@@ -634,14 +438,7 @@ extension NSToolbarItem.Identifier {
     static let rebootMachine = NSToolbarItem.Identifier("rebootMachine")
     static let powerOff = NSToolbarItem.Identifier("powerOff")
     static let pauseResume = NSToolbarItem.Identifier("pauseResume")
-    static let inspectorTrackingSeparator = NSToolbarItem.Identifier("inspectorTrackingSeparator")
-    static let basicSpecialCodes = NSToolbarItem.Identifier("basicSpecialCodes")
-    static let basicFileMenu = NSToolbarItem.Identifier("basicFileMenu")
-    static let basicRun = NSToolbarItem.Identifier("basicRun")
-    static let toggleBasic = NSToolbarItem.Identifier("toggleBasic")
-    static let toggleSystem = NSToolbarItem.Identifier("toggleSystem")
-    static let toggleDisplayAudio = NSToolbarItem.Identifier("toggleDisplayAudio")
     static let toggleDebugPanel = NSToolbarItem.Identifier("toggleDebugPanel")
-    static let closeInspector = NSToolbarItem.Identifier("closeInspector")
-    static let inspectorTitle = NSToolbarItem.Identifier("inspectorTitle")
+    static let toggleInspector = NSToolbarItem.Identifier("toggleInspector")
+    static let inspectorTrackingSeparator = NSToolbarItem.Identifier("inspectorTrackingSeparator")
 }

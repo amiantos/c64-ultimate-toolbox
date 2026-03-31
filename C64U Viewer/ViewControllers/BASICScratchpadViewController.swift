@@ -97,11 +97,7 @@ final class BASICScratchpadViewController: NSViewController {
         let filename = currentFileURL?.lastPathComponent ?? "Untitled"
         let dirty = isDirty ? " *" : ""
         title = "BASIC — \(filename)\(dirty)"
-
-        // Refresh the toolbar title item if we're in a window
-        if let dwc = view.window?.windowController as? DeviceWindowController {
-            dwc.refreshToolbarItem(.inspectorTitle)
-        }
+        onTitleChanged?(title ?? "")
     }
 
     private func updateLineCount() {
@@ -148,7 +144,9 @@ final class BASICScratchpadViewController: NSViewController {
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height), in: sender)
     }
 
-    @objc private func loadSampleFromMenu(_ sender: NSMenuItem) {
+    var onTitleChanged: ((String) -> Void)?
+
+    @objc func loadSampleFromMenu(_ sender: NSMenuItem) {
         guard let sample = sender.representedObject as? BASICSample else { return }
         loadSample(sample)
     }
@@ -232,16 +230,6 @@ final class BASICScratchpadViewController: NSViewController {
         updateLineCount()
     }
 
-    func showFileMenu(from sender: Any?) {
-        // Find the toolbar item view and show the menu from it
-        guard let toolbar = view.window?.toolbar else { return }
-        for item in toolbar.items where item.itemIdentifier == .basicFileMenu {
-            if let button = item.view as? NSButton ?? (item.view?.subviews.first as? NSButton) {
-                showFileMenu(button)
-                return
-            }
-        }
-    }
 
     @objc func newFile() {
         promptIfDirty { [weak self] in

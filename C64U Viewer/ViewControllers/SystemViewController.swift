@@ -24,8 +24,7 @@ final class SystemViewController: NSViewController {
     required init?(coder: NSCoder) { fatalError() }
 
     override func loadView() {
-        let container = BackgroundView()
-        container.backgroundColor = .controlBackgroundColor
+        let container = NSView()
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
