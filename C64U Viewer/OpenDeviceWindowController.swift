@@ -20,6 +20,12 @@ final class OpenDeviceWindowController: NSWindowController {
     private let connectToolboxButton = NSButton(title: "Connect", target: nil, action: nil)
     private let toolboxErrorLabel = NSTextField(wrappingLabelWithString: "")
 
+    // Discovery
+    private let scanner = DeviceScanner()
+    private var scanButton: NSButton!
+    private var scanSpinner: NSProgressIndicator!
+    private var discoveredDevicesStack: NSStackView!
+
     // Viewer fields
     private let videoPortField = NSTextField()
     private let audioPortField = NSTextField()
@@ -98,12 +104,39 @@ final class OpenDeviceWindowController: NSWindowController {
         connectToolboxButton.target = self
         connectToolboxButton.action = #selector(connectToolbox)
 
+        // Scan network button
+        let scanRow = NSStackView()
+        scanRow.orientation = .horizontal
+        scanRow.spacing = 8
+        scanRow.translatesAutoresizingMaskIntoConstraints = false
+
+        scanButton = NSButton(title: "Scan Network", target: self, action: #selector(scanNetwork))
+        scanButton.bezelStyle = .rounded
+        scanButton.controlSize = .small
+
+        scanSpinner = NSProgressIndicator()
+        scanSpinner.style = .spinning
+        scanSpinner.controlSize = .small
+        scanSpinner.isHidden = true
+
+        scanRow.addArrangedSubview(scanButton)
+        scanRow.addArrangedSubview(scanSpinner)
+
+        // Discovered devices container
+        discoveredDevicesStack = NSStackView()
+        discoveredDevicesStack.orientation = .vertical
+        discoveredDevicesStack.alignment = .leading
+        discoveredDevicesStack.spacing = 4
+        discoveredDevicesStack.translatesAutoresizingMaskIntoConstraints = false
+
         var views: [NSView] = [
             ipLabel, ipField,
             passwordLabel, passwordField,
             savePasswordCheckbox,
             toolboxErrorLabel,
             connectToolboxButton,
+            scanRow,
+            discoveredDevicesStack,
         ]
 
         // Recent connections
@@ -233,6 +266,52 @@ final class OpenDeviceWindowController: NSWindowController {
             }
             self.connectToolboxButton.isEnabled = true
         }
+    }
+
+    @objc private func scanNetwork() {
+        scanButton.isEnabled = false
+        scanButton.title = "Scanning..."
+        scanSpinner.isHidden = false
+        scanSpinner.startAnimation(nil)
+
+        // Clear previous results
+        for view in discoveredDevicesStack.arrangedSubviews {
+            discoveredDevicesStack.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+
+        scanner.scan { [weak self] device in
+            guard let self else { return }
+            let button = NSButton(
+                title: "\(device.info.product) — \(device.info.hostname) (\(device.ipAddress))",
+                target: self,
+                action: #selector(self.connectDiscoveredDevice(_:))
+            )
+            button.bezelStyle = .inline
+            button.controlSize = .small
+            button.identifier = NSUserInterfaceItemIdentifier(device.ipAddress)
+            button.translatesAutoresizingMaskIntoConstraints = false
+            self.discoveredDevicesStack.addArrangedSubview(button)
+        } onComplete: { [weak self] in
+            guard let self else { return }
+            self.scanButton.isEnabled = true
+            self.scanButton.title = "Scan Network"
+            self.scanSpinner.stopAnimation(nil)
+            self.scanSpinner.isHidden = true
+
+            if self.discoveredDevicesStack.arrangedSubviews.isEmpty {
+                let noDevices = NSTextField(labelWithString: "No devices found")
+                noDevices.font = .systemFont(ofSize: 11)
+                noDevices.textColor = .secondaryLabelColor
+                self.discoveredDevicesStack.addArrangedSubview(noDevices)
+            }
+        }
+    }
+
+    @objc private func connectDiscoveredDevice(_ sender: NSButton) {
+        guard let ip = sender.identifier?.rawValue else { return }
+        ipField.stringValue = ip
+        connectToolbox()
     }
 
     @objc private func startListening() {

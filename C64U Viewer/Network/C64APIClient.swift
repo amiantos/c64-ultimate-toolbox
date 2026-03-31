@@ -197,6 +197,11 @@ final class C64APIClient: Sendable {
         try await post("/v1/machine:writemem?address=\(hex)", body: data)
     }
 
+    func writeMemHex(address: Int, dataHex: String) async throws {
+        let addrHex = String(format: "%04X", address)
+        try await put("/v1/machine:writemem?address=\(addrHex)&data=\(dataHex)")
+    }
+
     // MARK: - HTTP Helpers
 
     @discardableResult

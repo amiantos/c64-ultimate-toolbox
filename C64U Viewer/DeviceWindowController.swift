@@ -581,6 +581,8 @@ extension DeviceWindowController: SidebarViewControllerDelegate {
                 viewController = BASICScratchpadViewController(connection: connection)
             case .fileManager:
                 viewController = FileManagerViewController(connection: connection)
+            case .memoryBrowser:
+                viewController = MemoryBrowserViewController(connection: connection)
             default:
                 return // not yet implemented or no inspector
             }

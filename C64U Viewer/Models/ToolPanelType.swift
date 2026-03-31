@@ -43,7 +43,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 
     var isImplemented: Bool {
         switch self {
-        case .basicScratchpad, .fileManager, .system, .displayAndAudio:
+        case .basicScratchpad, .fileManager, .system, .displayAndAudio, .memoryBrowser:
             return true
         default:
             return false
