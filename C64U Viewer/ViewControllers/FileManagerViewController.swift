@@ -135,12 +135,22 @@ final class FileManagerViewController: NSViewController, NSOutlineViewDataSource
         statusBar.edgeInsets = NSEdgeInsets(top: 4, left: 16, bottom: 4, right: 8)
         statusBar.translatesAutoresizingMaskIntoConstraints = false
 
+        let sectionHeader = NSTextField(labelWithString: "File System")
+        sectionHeader.font = .systemFont(ofSize: 11, weight: .bold)
+        sectionHeader.textColor = .secondaryLabelColor
+        sectionHeader.translatesAutoresizingMaskIntoConstraints = false
+
+        container.addSubview(sectionHeader)
         container.addSubview(scrollView)
         container.addSubview(bottomSeparator)
         container.addSubview(statusBar)
 
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor),
+            sectionHeader.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor, constant: 4),
+            sectionHeader.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
+            sectionHeader.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -8),
+
+            scrollView.topAnchor.constraint(equalTo: sectionHeader.bottomAnchor, constant: 4),
             scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomSeparator.topAnchor),
@@ -210,9 +220,9 @@ final class FileManagerViewController: NSViewController, NSOutlineViewDataSource
             node.isLoading = false
         } catch {
             Log.error("Failed to load \(path): \(error)")
-            node.children = []
+            node.children = nil  // leave as not-loaded so expanding retries
             node.isLoading = false
-            statusLabel.stringValue = "Unable to load \(path)"
+            statusLabel.stringValue = "\(node.name) is unavailable"
         }
     }
 
@@ -322,24 +332,28 @@ final class FileManagerViewController: NSViewController, NSOutlineViewDataSource
         if node is PlaceholderNode {
             cell.textField?.stringValue = "Loading…"
             cell.textField?.textColor = .secondaryLabelColor
+            cell.textField?.toolTip = nil
             cell.imageView?.image = nil
             sizeLabel?.stringValue = ""
         } else if node.entry == nil {
             // Root node
             cell.textField?.stringValue = node.name
             cell.textField?.textColor = .labelColor
+            cell.textField?.toolTip = nil
             cell.imageView?.image = NSImage(systemSymbolName: "desktopcomputer", accessibilityDescription: "C64")
             cell.imageView?.contentTintColor = .secondaryLabelColor
             sizeLabel?.stringValue = ""
         } else if node.isDirectory {
             cell.textField?.stringValue = node.name
             cell.textField?.textColor = .labelColor
+            cell.textField?.toolTip = node.name
             cell.imageView?.image = NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil)
             cell.imageView?.contentTintColor = .systemBlue
             sizeLabel?.stringValue = ""
         } else {
             cell.textField?.stringValue = node.name
             cell.textField?.textColor = .labelColor
+            cell.textField?.toolTip = node.name
             cell.imageView?.image = NSImage(systemSymbolName: "doc", accessibilityDescription: nil)
             cell.imageView?.contentTintColor = .secondaryLabelColor
             // Size shown only when selected — handled in outlineViewSelectionDidChange
@@ -359,11 +373,14 @@ final class FileManagerViewController: NSViewController, NSOutlineViewDataSource
 
         Task {
             await loadChildren(of: node)
-            outlineView.reloadItem(node, reloadChildren: true)
 
-            // Update status
-            if let children = node.children {
-                statusLabel.stringValue = "\(children.count) item\(children.count == 1 ? "" : "s") in \(node.name)"
+            if node.children != nil {
+                outlineView.reloadItem(node, reloadChildren: true)
+                let count = node.children?.count ?? 0
+                statusLabel.stringValue = "\(count) item\(count == 1 ? "" : "s") in \(node.name)"
+            } else {
+                // Load failed — collapse so user can retry
+                outlineView.collapseItem(node)
             }
         }
     }
