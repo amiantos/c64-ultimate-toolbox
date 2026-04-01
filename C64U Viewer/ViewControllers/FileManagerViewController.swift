@@ -42,11 +42,6 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         pathControl.target = self
         pathControl.action = #selector(pathClicked(_:))
 
-        // Separator between path bar and table
-        let topSeparator = NSBox()
-        topSeparator.boxType = .separator
-        topSeparator.translatesAutoresizingMaskIntoConstraints = false
-
         // Table view for file listing
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -59,14 +54,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         nameColumn.resizingMask = .autoresizingMask
         tableView.addTableColumn(nameColumn)
 
-        let sizeColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("size"))
-        sizeColumn.title = "Size"
-        sizeColumn.width = 70
-        sizeColumn.minWidth = 60
-        sizeColumn.maxWidth = 100
-        sizeColumn.resizingMask = []
-        tableView.addTableColumn(sizeColumn)
-
+        tableView.headerView = nil
         tableView.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
         tableView.backgroundColor = .clear
         tableView.dataSource = self
@@ -124,7 +112,6 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         statusBar.translatesAutoresizingMaskIntoConstraints = false
 
         container.addSubview(pathControl)
-        container.addSubview(topSeparator)
         container.addSubview(scrollView)
         container.addSubview(bottomSeparator)
         container.addSubview(statusBar)
@@ -136,11 +123,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
             pathControl.widthAnchor.constraint(lessThanOrEqualTo: container.widthAnchor, constant: -16),
             pathControl.heightAnchor.constraint(equalToConstant: 18),
 
-            topSeparator.topAnchor.constraint(equalTo: pathControl.bottomAnchor, constant: 4),
-            topSeparator.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            topSeparator.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-
-            scrollView.topAnchor.constraint(equalTo: topSeparator.bottomAnchor),
+            scrollView.topAnchor.constraint(equalTo: pathControl.bottomAnchor, constant: 4),
             scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomSeparator.topAnchor),
@@ -314,6 +297,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         if tableColumn?.identifier.rawValue == "name" {
             let cellID = NSUserInterfaceItemIdentifier("NameCell")
             let cell: NSTableCellView
+            let sizeTag = 100
             if let existing = tableView.makeView(withIdentifier: cellID, owner: nil) as? NSTableCellView {
                 cell = existing
             } else {
@@ -328,8 +312,19 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                 let textField = NSTextField(labelWithString: "")
                 textField.translatesAutoresizingMaskIntoConstraints = false
                 textField.lineBreakMode = .byTruncatingTail
+                textField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
                 cell.addSubview(textField)
                 cell.textField = textField
+
+                let sizeLabel = NSTextField(labelWithString: "")
+                sizeLabel.translatesAutoresizingMaskIntoConstraints = false
+                sizeLabel.alignment = .right
+                sizeLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+                sizeLabel.textColor = .secondaryLabelColor
+                sizeLabel.tag = sizeTag
+                sizeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+                sizeLabel.setContentHuggingPriority(.required, for: .horizontal)
+                cell.addSubview(sizeLabel)
 
                 NSLayoutConstraint.activate([
                     imageView.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
@@ -337,49 +332,25 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                     imageView.widthAnchor.constraint(equalToConstant: 16),
                     imageView.heightAnchor.constraint(equalToConstant: 16),
                     textField.leadingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: 4),
-                    textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor),
                     textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                    sizeLabel.leadingAnchor.constraint(greaterThanOrEqualTo: textField.trailingAnchor, constant: 4),
+                    sizeLabel.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
+                    sizeLabel.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
                 ])
             }
+
+            let sizeLabel = cell.viewWithTag(sizeTag) as? NSTextField
 
             if isParentRow {
                 cell.textField?.stringValue = ".."
                 cell.imageView?.image = NSImage(systemSymbolName: "arrowshape.turn.up.left.fill", accessibilityDescription: "Parent directory")
                 cell.imageView?.contentTintColor = .secondaryLabelColor
+                sizeLabel?.stringValue = ""
             } else if let entry {
                 cell.textField?.stringValue = entry.name
                 cell.imageView?.image = NSImage(systemSymbolName: entry.isDirectory ? "folder.fill" : "doc", accessibilityDescription: nil)
                 cell.imageView?.contentTintColor = entry.isDirectory ? .systemBlue : .secondaryLabelColor
-            }
-            return cell
-        }
-
-        if tableColumn?.identifier.rawValue == "size" {
-            let cellID = NSUserInterfaceItemIdentifier("SizeCell")
-            let cell: NSTableCellView
-            if let existing = tableView.makeView(withIdentifier: cellID, owner: nil) as? NSTableCellView {
-                cell = existing
-            } else {
-                cell = NSTableCellView()
-                cell.identifier = cellID
-                let textField = NSTextField(labelWithString: "")
-                textField.translatesAutoresizingMaskIntoConstraints = false
-                textField.alignment = .right
-                textField.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
-                textField.textColor = .secondaryLabelColor
-                cell.addSubview(textField)
-                cell.textField = textField
-                NSLayoutConstraint.activate([
-                    textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
-                    textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
-                    textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-                ])
-            }
-
-            if isParentRow {
-                cell.textField?.stringValue = ""
-            } else if let entry {
-                cell.textField?.stringValue = entry.isDirectory ? "" : formatFileSize(entry.size)
+                sizeLabel?.stringValue = entry.isDirectory ? "" : formatFileSize(entry.size)
             }
             return cell
         }
