@@ -5,17 +5,52 @@
 import AppKit
 internal import UniformTypeIdentifiers
 
-final class FileManagerViewController: NSViewController, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate {
+// MARK: - Tree Node Model
+
+private class TreeNode {
+    let entry: FTPFileEntry?
+    let name: String
+    let isDirectory: Bool
+    var children: [TreeNode]?  // nil = not loaded, [] = loaded but empty
+    var isLoading = false
+
+    /// Root node
+    init(rootName: String) {
+        self.entry = nil
+        self.name = rootName
+        self.isDirectory = true
+    }
+
+    /// Node from FTP entry
+    init(entry: FTPFileEntry) {
+        self.entry = entry
+        self.name = entry.name
+        self.isDirectory = entry.isDirectory
+    }
+
+    var path: String {
+        entry?.path ?? "/"
+    }
+}
+
+/// Placeholder shown while a directory's children are being fetched
+private class PlaceholderNode: TreeNode {
+    init() {
+        super.init(rootName: "Loading…")
+        self.children = []
+    }
+}
+
+// MARK: - FileManagerViewController
+
+final class FileManagerViewController: NSViewController, NSOutlineViewDataSource, NSOutlineViewDelegate, NSMenuDelegate {
     let connection: C64Connection
     private var ftpClient: FTPClient?
-    private let tableView = NSTableView()
-    private var pathControl: NSPathControl!
+    private let outlineView = NSOutlineView()
     private var statusLabel: NSTextField!
     private var progressIndicator: NSProgressIndicator!
 
-    private var currentPath = "/"
-    private var entries: [FTPFileEntry] = []
-    private var isAtRoot: Bool { currentPath == "/" }
+    private let rootNode = TreeNode(rootName: "C64")
 
     init(connection: C64Connection) {
         self.connection = connection
@@ -30,19 +65,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         let container = BackgroundView()
         container.backgroundColor = .controlBackgroundColor
 
-        // Path bar at top
-        pathControl = NSPathControl()
-        pathControl.pathStyle = .standard
-        pathControl.isEditable = false
-        pathControl.backgroundColor = .clear
-        pathControl.focusRingType = .none
-        pathControl.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        pathControl.lineBreakMode = .byTruncatingMiddle
-        pathControl.translatesAutoresizingMaskIntoConstraints = false
-        pathControl.target = self
-        pathControl.action = #selector(pathClicked(_:))
-
-        // Table view for file listing
+        // Outline view for tree-based file listing
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.autohidesScrollers = true
@@ -52,21 +75,22 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
         nameColumn.title = "Name"
         nameColumn.resizingMask = .autoresizingMask
-        tableView.addTableColumn(nameColumn)
+        outlineView.addTableColumn(nameColumn)
+        outlineView.outlineTableColumn = nameColumn
 
-        tableView.headerView = nil
-        tableView.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
-        tableView.backgroundColor = .clear
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.rowSizeStyle = .default
-        tableView.allowsMultipleSelection = true
-        tableView.doubleAction = #selector(doubleClickedRow)
-        tableView.target = self
+        outlineView.headerView = nil
+        outlineView.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        outlineView.backgroundColor = .clear
+        outlineView.dataSource = self
+        outlineView.delegate = self
+        outlineView.rowSizeStyle = .default
+        outlineView.allowsMultipleSelection = true
+        outlineView.doubleAction = #selector(doubleClickedRow)
+        outlineView.target = self
 
         // Keyboard shortcuts
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, self.view.window?.firstResponder === self.tableView else { return event }
+            guard let self, self.view.window?.firstResponder === self.outlineView else { return event }
             switch event.keyCode {
             case 51: // Delete/Backspace
                 self.deleteSelected()
@@ -82,10 +106,10 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         }
 
         // Register for drag and drop from Finder
-        tableView.registerForDraggedTypes([.fileURL])
-        tableView.setDraggingSourceOperationMask(.copy, forLocal: false)
+        outlineView.registerForDraggedTypes([.fileURL])
+        outlineView.setDraggingSourceOperationMask(.copy, forLocal: false)
 
-        scrollView.documentView = tableView
+        scrollView.documentView = outlineView
 
         // Status bar
         statusLabel = NSTextField(labelWithString: "Connecting...")
@@ -111,19 +135,12 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         statusBar.edgeInsets = NSEdgeInsets(top: 4, left: 16, bottom: 4, right: 8)
         statusBar.translatesAutoresizingMaskIntoConstraints = false
 
-        container.addSubview(pathControl)
         container.addSubview(scrollView)
         container.addSubview(bottomSeparator)
         container.addSubview(statusBar)
 
         NSLayoutConstraint.activate([
-            pathControl.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor, constant: 4),
-            pathControl.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
-            pathControl.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -8),
-            pathControl.widthAnchor.constraint(lessThanOrEqualTo: container.widthAnchor, constant: -16),
-            pathControl.heightAnchor.constraint(equalToConstant: 18),
-
-            scrollView.topAnchor.constraint(equalTo: pathControl.bottomAnchor, constant: 4),
+            scrollView.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomSeparator.topAnchor),
@@ -143,7 +160,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         // Dynamic context menu
         let menu = NSMenu()
         menu.delegate = self
-        tableView.menu = menu
+        outlineView.menu = menu
 
         self.view = container
 
@@ -166,90 +183,236 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                 try await ftpClient?.connect()
                 statusLabel.stringValue = "Connected"
 
-                await navigateTo(connection.fileManagerCurrentPath)
+                // Load root directory
+                await loadChildren(of: rootNode)
+                outlineView.reloadData()
+                outlineView.expandItem(rootNode)
+
+                // Restore previously expanded path
+                await restoreExpandedPath(connection.fileManagerCurrentPath)
             } catch {
                 statusLabel.stringValue = "FTP error: \(error.localizedDescription)"
             }
         }
     }
 
-    // MARK: - Navigation
+    // MARK: - Tree Loading
 
-    private func navigateTo(_ path: String) async {
-        guard let client = ftpClient else {
-            print("[FileManager] No FTP client")
-            return
-        }
-        statusLabel.stringValue = "Loading..."
-        print("[FileManager] Navigating to: \(path)")
+    private func loadChildren(of node: TreeNode) async {
+        guard let client = ftpClient, node.isDirectory, !node.isLoading else { return }
+
+        node.isLoading = true
+        let path = node.path
 
         do {
             let listing = try await client.listDirectory(path)
-            print("[FileManager] Got \(listing.count) entries")
-            currentPath = path
-            connection.fileManagerCurrentPath = path
-            entries = listing
-            tableView.reloadData()
-            updatePathControl()
-            statusLabel.stringValue = "\(entries.count) item\(entries.count == 1 ? "" : "s")"
+            node.children = listing.map { TreeNode(entry: $0) }
+            node.isLoading = false
         } catch {
-            print("[FileManager] Error: \(error)")
-            statusLabel.stringValue = "Unable to navigate to \(path)"
+            Log.error("Failed to load \(path): \(error)")
+            node.children = []
+            node.isLoading = false
+            statusLabel.stringValue = "Unable to load \(path)"
         }
     }
 
-    private func updatePathControl() {
-        let components = currentPath.split(separator: "/").map(String.init)
-        var pathItems: [NSPathControlItem] = []
+    private func restoreExpandedPath(_ path: String) async {
+        guard path != "/" else { return }
 
-        let rootItem = NSPathControlItem()
-        rootItem.title = "/"
-        pathItems.append(rootItem)
+        let components = path.split(separator: "/").map(String.init)
+        var current = rootNode
 
         for component in components {
-            let item = NSPathControlItem()
-            item.title = component
-            pathItems.append(item)
+            // Ensure children are loaded
+            if current.children == nil {
+                await loadChildren(of: current)
+                outlineView.reloadItem(current, reloadChildren: true)
+            }
+
+            guard let child = current.children?.first(where: { $0.name == component && $0.isDirectory }) else {
+                break
+            }
+
+            outlineView.expandItem(child)
+            current = child
         }
 
-        pathControl.pathItems = pathItems
+        connection.fileManagerCurrentPath = current.path
     }
 
-    @objc private func pathClicked(_ sender: NSPathControl) {
-        guard let clickedItem = sender.clickedPathItem else { return }
-        let index = sender.pathItems.firstIndex(where: { $0 === clickedItem }) ?? 0
+    // MARK: - NSOutlineViewDataSource
 
-        if index == 0 {
-            Task { await navigateTo("/") }
+    func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+        let node = item as? TreeNode ?? rootNode
+        if node.isDirectory {
+            if let children = node.children {
+                return children.count
+            }
+            return 1  // placeholder "Loading…"
+        }
+        return 0
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+        let node = item as? TreeNode ?? rootNode
+        if let children = node.children {
+            return children[index]
+        }
+        // Return placeholder
+        return PlaceholderNode()
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
+        let node = item as? TreeNode ?? rootNode
+        return node.isDirectory && !(node is PlaceholderNode)
+    }
+
+    // MARK: - NSOutlineViewDelegate
+
+    func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
+        guard let node = item as? TreeNode else { return nil }
+
+        let cellID = NSUserInterfaceItemIdentifier("NameCell")
+        let sizeTag = 100
+        let cell: NSTableCellView
+
+        if let existing = outlineView.makeView(withIdentifier: cellID, owner: nil) as? NSTableCellView {
+            cell = existing
         } else {
-            let components = currentPath.split(separator: "/")
-            let targetPath = "/" + components.prefix(index).joined(separator: "/")
-            Task { await navigateTo(targetPath) }
+            cell = NSTableCellView()
+            cell.identifier = cellID
+
+            let imageView = NSImageView()
+            imageView.translatesAutoresizingMaskIntoConstraints = false
+            cell.addSubview(imageView)
+            cell.imageView = imageView
+
+            let textField = NSTextField(labelWithString: "")
+            textField.translatesAutoresizingMaskIntoConstraints = false
+            textField.lineBreakMode = .byTruncatingTail
+            textField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            cell.addSubview(textField)
+            cell.textField = textField
+
+            let sizeLabel = NSTextField(labelWithString: "")
+            sizeLabel.translatesAutoresizingMaskIntoConstraints = false
+            sizeLabel.alignment = .right
+            sizeLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+            sizeLabel.textColor = .secondaryLabelColor
+            sizeLabel.tag = sizeTag
+            sizeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+            sizeLabel.setContentHuggingPriority(.required, for: .horizontal)
+            cell.addSubview(sizeLabel)
+
+            NSLayoutConstraint.activate([
+                imageView.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
+                imageView.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                imageView.widthAnchor.constraint(equalToConstant: 16),
+                imageView.heightAnchor.constraint(equalToConstant: 16),
+                textField.leadingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: 4),
+                textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                sizeLabel.leadingAnchor.constraint(greaterThanOrEqualTo: textField.trailingAnchor, constant: 4),
+                sizeLabel.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
+                sizeLabel.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            ])
+        }
+
+        let sizeLabel = cell.viewWithTag(sizeTag) as? NSTextField
+
+        if node is PlaceholderNode {
+            cell.textField?.stringValue = "Loading…"
+            cell.textField?.textColor = .secondaryLabelColor
+            cell.imageView?.image = nil
+            sizeLabel?.stringValue = ""
+        } else if node.entry == nil {
+            // Root node
+            cell.textField?.stringValue = node.name
+            cell.textField?.textColor = .labelColor
+            cell.imageView?.image = NSImage(systemSymbolName: "desktopcomputer", accessibilityDescription: "C64")
+            cell.imageView?.contentTintColor = .secondaryLabelColor
+            sizeLabel?.stringValue = ""
+        } else if node.isDirectory {
+            cell.textField?.stringValue = node.name
+            cell.textField?.textColor = .labelColor
+            cell.imageView?.image = NSImage(systemSymbolName: "folder.fill", accessibilityDescription: nil)
+            cell.imageView?.contentTintColor = .systemBlue
+            sizeLabel?.stringValue = ""
+        } else {
+            cell.textField?.stringValue = node.name
+            cell.textField?.textColor = .labelColor
+            cell.imageView?.image = NSImage(systemSymbolName: "doc", accessibilityDescription: nil)
+            cell.imageView?.contentTintColor = .secondaryLabelColor
+            // Size shown only when selected — handled in outlineViewSelectionDidChange
+            sizeLabel?.stringValue = ""
+        }
+
+        return cell
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, shouldSelectItem item: Any) -> Bool {
+        !(item is PlaceholderNode)
+    }
+
+    func outlineViewItemWillExpand(_ notification: Notification) {
+        guard let node = notification.userInfo?["NSObject"] as? TreeNode else { return }
+        guard node.children == nil, !node.isLoading else { return }
+
+        Task {
+            await loadChildren(of: node)
+            outlineView.reloadItem(node, reloadChildren: true)
+
+            // Update status
+            if let children = node.children {
+                statusLabel.stringValue = "\(children.count) item\(children.count == 1 ? "" : "s") in \(node.name)"
+            }
         }
     }
+
+    func outlineViewSelectionDidChange(_ notification: Notification) {
+        let sizeTag = 100
+        let selectedRows = outlineView.selectedRowIndexes
+
+        // Update size labels: show for selected files, hide for others
+        for row in 0..<outlineView.numberOfRows {
+            guard let cellView = outlineView.view(atColumn: 0, row: row, makeIfNecessary: false) as? NSTableCellView,
+                  let sizeLabel = cellView.viewWithTag(sizeTag) as? NSTextField,
+                  let node = outlineView.item(atRow: row) as? TreeNode else { continue }
+
+            if selectedRows.contains(row), !node.isDirectory, let entry = node.entry {
+                sizeLabel.stringValue = formatFileSize(entry.size)
+            } else {
+                sizeLabel.stringValue = ""
+            }
+        }
+
+        // Track the deepest expanded directory for path restoration
+        guard let node = outlineView.item(atRow: outlineView.selectedRow) as? TreeNode else { return }
+        if node.isDirectory {
+            connection.fileManagerCurrentPath = node.path
+        } else if let parent = outlineView.parent(forItem: node) as? TreeNode {
+            connection.fileManagerCurrentPath = parent.path
+        }
+    }
+
+    // MARK: - Double Click
 
     @objc private func doubleClickedRow() {
-        let row = tableView.clickedRow
+        let row = outlineView.clickedRow
         guard row >= 0 else { return }
+        guard let node = outlineView.item(atRow: row) as? TreeNode else { return }
 
-        // ".." row — go up
-        if !isAtRoot && row == 0 {
-            let parentPath = (currentPath as NSString).deletingLastPathComponent
-            Task { await navigateTo(parentPath.isEmpty ? "/" : parentPath) }
-            return
-        }
-
-        let offset = isAtRoot ? 0 : 1
-        let index = row - offset
-        guard index >= 0, index < entries.count else { return }
-        let entry = entries[index]
-
-        if entry.isDirectory {
-            Task { await navigateTo(entry.path) }
+        // Toggle expand/collapse for directories
+        if node.isDirectory {
+            if outlineView.isItemExpanded(node) {
+                outlineView.collapseItem(node)
+            } else {
+                outlineView.expandItem(node)
+            }
             return
         }
 
         // Double-click runs the default action for the file type
+        guard let entry = node.entry else { return }
         let ext = entry.name.lowercased().components(separatedBy: ".").last ?? ""
         let diskExtensions = ["d64", "d71", "d81", "g64", "g71"]
         let textExtensions = ["txt", "nfo", "diz", "me", "doc", "readme", "1st"]
@@ -269,109 +432,48 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         }
     }
 
+    // MARK: - Refresh
+
     @objc func refreshDirectory() {
-        // Reconnect if needed, then reload
         Task {
             if ftpClient == nil {
                 connectAndLoad()
             } else {
-                await navigateTo(currentPath)
+                // Reload the currently selected directory, or root
+                let node = selectedDirectoryNode() ?? rootNode
+                node.children = nil
+                await loadChildren(of: node)
+                outlineView.reloadItem(node, reloadChildren: true)
+                outlineView.expandItem(node)
+                let count = node.children?.count ?? 0
+                statusLabel.stringValue = "\(count) item\(count == 1 ? "" : "s")"
             }
         }
-    }
-
-    // MARK: - NSTableViewDataSource
-
-    func numberOfRows(in tableView: NSTableView) -> Int {
-        // Add ".." entry if not at root
-        return entries.count + (isAtRoot ? 0 : 1)
-    }
-
-    // MARK: - NSTableViewDelegate
-
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        // ".." entry for going up
-        let isParentRow = !isAtRoot && row == 0
-        let entry: FTPFileEntry? = isParentRow ? nil : entries[row - (isAtRoot ? 0 : 1)]
-
-        if tableColumn?.identifier.rawValue == "name" {
-            let cellID = NSUserInterfaceItemIdentifier("NameCell")
-            let cell: NSTableCellView
-            let sizeTag = 100
-            if let existing = tableView.makeView(withIdentifier: cellID, owner: nil) as? NSTableCellView {
-                cell = existing
-            } else {
-                cell = NSTableCellView()
-                cell.identifier = cellID
-
-                let imageView = NSImageView()
-                imageView.translatesAutoresizingMaskIntoConstraints = false
-                cell.addSubview(imageView)
-                cell.imageView = imageView
-
-                let textField = NSTextField(labelWithString: "")
-                textField.translatesAutoresizingMaskIntoConstraints = false
-                textField.lineBreakMode = .byTruncatingTail
-                textField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-                cell.addSubview(textField)
-                cell.textField = textField
-
-                let sizeLabel = NSTextField(labelWithString: "")
-                sizeLabel.translatesAutoresizingMaskIntoConstraints = false
-                sizeLabel.alignment = .right
-                sizeLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
-                sizeLabel.textColor = .secondaryLabelColor
-                sizeLabel.tag = sizeTag
-                sizeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
-                sizeLabel.setContentHuggingPriority(.required, for: .horizontal)
-                cell.addSubview(sizeLabel)
-
-                NSLayoutConstraint.activate([
-                    imageView.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
-                    imageView.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-                    imageView.widthAnchor.constraint(equalToConstant: 16),
-                    imageView.heightAnchor.constraint(equalToConstant: 16),
-                    textField.leadingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: 4),
-                    textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-                    sizeLabel.leadingAnchor.constraint(greaterThanOrEqualTo: textField.trailingAnchor, constant: 4),
-                    sizeLabel.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
-                    sizeLabel.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-                ])
-            }
-
-            let sizeLabel = cell.viewWithTag(sizeTag) as? NSTextField
-
-            if isParentRow {
-                cell.textField?.stringValue = ".."
-                cell.imageView?.image = NSImage(systemSymbolName: "arrowshape.turn.up.left.fill", accessibilityDescription: "Parent directory")
-                cell.imageView?.contentTintColor = .secondaryLabelColor
-                sizeLabel?.stringValue = ""
-            } else if let entry {
-                cell.textField?.stringValue = entry.name
-                cell.imageView?.image = NSImage(systemSymbolName: entry.isDirectory ? "folder.fill" : "doc", accessibilityDescription: nil)
-                cell.imageView?.contentTintColor = entry.isDirectory ? .systemBlue : .secondaryLabelColor
-                sizeLabel?.stringValue = entry.isDirectory ? "" : formatFileSize(entry.size)
-            }
-            return cell
-        }
-
-        return nil
     }
 
     // MARK: - Drag and Drop
 
-    func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int, proposedDropOperation dropOperation: NSTableView.DropOperation) -> NSDragOperation {
+    func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo, proposedItem item: Any?, proposedChildIndex index: Int) -> NSDragOperation {
         if info.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) {
             return .copy
         }
         return []
     }
 
-    func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation) -> Bool {
+    func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo, item: Any?, childIndex index: Int) -> Bool {
         guard let urls = info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] else {
             return false
         }
-        uploadURLs(urls, to: currentPath)
+        // Determine target directory from drop target
+        let targetNode: TreeNode
+        if let node = item as? TreeNode, node.isDirectory {
+            targetNode = node
+        } else if let node = item as? TreeNode, let parent = outlineView.parent(forItem: node) as? TreeNode {
+            targetNode = parent
+        } else {
+            targetNode = rootNode
+        }
+        uploadURLs(urls, to: targetNode.path, reloadNode: targetNode)
         return true
     }
 
@@ -381,12 +483,10 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         menu.removeAllItems()
 
         // Select the row under the cursor
-        let point = tableView.convert(NSEvent.mouseLocation, from: nil)
-        // Convert from screen coordinates
-        let localPoint = tableView.convert(tableView.window?.convertPoint(fromScreen: NSEvent.mouseLocation) ?? .zero, from: nil)
-        let clickedRow = tableView.row(at: localPoint)
+        let localPoint = outlineView.convert(outlineView.window?.convertPoint(fromScreen: NSEvent.mouseLocation) ?? .zero, from: nil)
+        let clickedRow = outlineView.row(at: localPoint)
         if clickedRow >= 0 {
-            tableView.selectRowIndexes(IndexSet(integer: clickedRow), byExtendingSelection: false)
+            outlineView.selectRowIndexes(IndexSet(integer: clickedRow), byExtendingSelection: false)
         }
 
         let entry = selectedEntry()
@@ -444,9 +544,6 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
             do {
                 try await client.mountDisk(drive: "a", imagePath: entry.path)
 
-                // Use two keyboard buffer writes:
-                // 1) LOAD"*",8,1 + RETURN (split into two parts since buffer is 10 bytes max)
-                //    First: LOAD"*",8 + RETURN (10 bytes) — this starts the load
                 let loadBytes: [UInt8] = [
                     0x4C, 0x4F, 0x41, 0x44,  // LOAD
                     0x22, 0x2A, 0x22, 0x2C,  // "*",
@@ -456,7 +553,6 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                 try await client.writeMem(address: 0x0277, data: Data(loadBytes))
                 try await client.writeMem(address: 0x00C6, data: Data([UInt8(loadBytes.count)]))
 
-                // 2) Wait for LOAD to complete, then send RUN + RETURN
                 try await Task.sleep(for: .seconds(3))
                 let runBytes: [UInt8] = [0x52, 0x55, 0x4E, 0x0D]  // RUN + RETURN
                 try await client.writeMem(address: 0x0277, data: Data(runBytes))
@@ -579,11 +675,9 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
 
         Task {
             do {
-                // Download to temp file
                 let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(entry.name)
                 try await client.downloadFile(remotePath: entry.path, localURL: tempURL)
 
-                // Read content — try UTF-8, fall back to Latin-1
                 let content: String
                 if let utf8 = try? String(contentsOf: tempURL, encoding: .utf8) {
                     content = utf8
@@ -595,7 +689,6 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
 
                 try? FileManager.default.removeItem(at: tempURL)
 
-                // Show in a new window
                 let window = NSWindow(
                     contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
                     styleMask: [.titled, .closable, .resizable, .miniaturizable],
@@ -631,11 +724,12 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
         if panel.runModal() == .OK {
-            uploadURLs(panel.urls, to: currentPath)
+            let targetNode = selectedDirectoryNode() ?? rootNode
+            uploadURLs(panel.urls, to: targetNode.path, reloadNode: targetNode)
         }
     }
 
-    private func uploadURLs(_ urls: [URL], to targetPath: String) {
+    private func uploadURLs(_ urls: [URL], to targetPath: String, reloadNode: TreeNode) {
         progressIndicator.isHidden = false
         progressIndicator.doubleValue = 0
 
@@ -679,7 +773,12 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
 
                 statusLabel.stringValue = "Upload complete"
                 progressIndicator.isHidden = true
-                await navigateTo(currentPath)
+
+                // Reload the target directory in the tree
+                reloadNode.children = nil
+                await loadChildren(of: reloadNode)
+                outlineView.reloadItem(reloadNode, reloadChildren: true)
+                outlineView.expandItem(reloadNode)
             } catch {
                 statusLabel.stringValue = "Upload error: \(error.localizedDescription)"
                 progressIndicator.isHidden = true
@@ -716,16 +815,23 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         nameField.placeholderString = "Folder Name"
         alert.accessoryView = nameField
         guard let window = view.window else { return }
+
+        let targetNode = selectedDirectoryNode() ?? rootNode
+
         alert.beginSheetModal(for: window) { [weak self] response in
             guard let self, response == .alertFirstButtonReturn else { return }
             let name = nameField.stringValue.trimmingCharacters(in: .whitespaces)
             guard !name.isEmpty else { return }
 
-            let fullPath = self.currentPath.hasSuffix("/") ? self.currentPath + name : self.currentPath + "/" + name
+            let fullPath = targetNode.path.hasSuffix("/") ? targetNode.path + name : targetNode.path + "/" + name
             Task {
                 do {
                     try await self.ftpClient?.createDirectory(fullPath)
-                    await self.navigateTo(self.currentPath)
+                    // Reload parent
+                    targetNode.children = nil
+                    await self.loadChildren(of: targetNode)
+                    self.outlineView.reloadItem(targetNode, reloadChildren: true)
+                    self.outlineView.expandItem(targetNode)
                 } catch {
                     self.showError("Error", details: error.localizedDescription)
                 }
@@ -750,9 +856,9 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
         alert.addButton(withTitle: "Move")
         alert.addButton(withTitle: "Cancel")
         let pathField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
-        // Pre-fill with clipboard if it looks like a device path, otherwise current path
         let clipboard = NSPasteboard.general.string(forType: .string) ?? ""
-        pathField.stringValue = clipboard.hasPrefix("/") ? clipboard : currentPath
+        let currentDir = selectedDirectoryNode()?.path ?? "/"
+        pathField.stringValue = clipboard.hasPrefix("/") ? clipboard : currentDir
         pathField.placeholderString = "/path/to/destination"
         alert.accessoryView = pathField
         guard let window = view.window else { return }
@@ -774,7 +880,8 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                 if !errors.isEmpty {
                     self.showError("Move Failed", details: errors.joined(separator: "\n"))
                 }
-                await self.navigateTo(self.currentPath)
+                // Reload the parent of the moved items
+                self.reloadParentOfSelection()
             }
         }
     }
@@ -801,7 +908,7 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
             Task {
                 do {
                     try await self.ftpClient?.rename(from: entry.path, to: newPath)
-                    await self.navigateTo(self.currentPath)
+                    self.reloadParentOfSelection()
                 } catch {
                     self.showError("Error", details: error.localizedDescription)
                 }
@@ -833,26 +940,50 @@ final class FileManagerViewController: NSViewController, NSTableViewDataSource, 
                         self.showError("Delete Failed", details: "\(entry.name): \(error.localizedDescription)")
                     }
                 }
-                await self.navigateTo(self.currentPath)
+                self.reloadParentOfSelection()
             }
         }
     }
 
     // MARK: - Helpers
 
-    private func selectedEntry() -> FTPFileEntry? {
-        let row = tableView.selectedRow
+    private func selectedNode() -> TreeNode? {
+        let row = outlineView.selectedRow
         guard row >= 0 else { return nil }
-        let offset = isAtRoot ? 0 : 1
-        guard row >= offset, (row - offset) < entries.count else { return nil }
-        return entries[row - offset]
+        return outlineView.item(atRow: row) as? TreeNode
+    }
+
+    private func selectedEntry() -> FTPFileEntry? {
+        selectedNode()?.entry
     }
 
     private func selectedEntries() -> [FTPFileEntry] {
-        let offset = isAtRoot ? 0 : 1
-        return tableView.selectedRowIndexes.compactMap { row in
-            guard row >= offset, (row - offset) < entries.count else { return nil }
-            return entries[row - offset]
+        outlineView.selectedRowIndexes.compactMap { row in
+            (outlineView.item(atRow: row) as? TreeNode)?.entry
+        }
+    }
+
+    /// Returns the selected directory node, or the parent directory of the selected file
+    private func selectedDirectoryNode() -> TreeNode? {
+        guard let node = selectedNode() else { return nil }
+        if node.isDirectory {
+            return node
+        }
+        return outlineView.parent(forItem: node) as? TreeNode
+    }
+
+    private func reloadParentOfSelection() {
+        Task {
+            let parentNode: TreeNode
+            if let node = selectedNode(), let parent = outlineView.parent(forItem: node) as? TreeNode {
+                parentNode = parent
+            } else {
+                parentNode = rootNode
+            }
+            parentNode.children = nil
+            await loadChildren(of: parentNode)
+            outlineView.reloadItem(parentNode, reloadChildren: true)
+            outlineView.expandItem(parentNode)
         }
     }
 
