@@ -581,19 +581,22 @@ private final class ConfigItemRow: NSView {
         row.translatesAutoresizingMaskIntoConstraints = false
 
         nameLabel.font = .systemFont(ofSize: 10)
+        nameLabel.alignment = .right
         nameLabel.lineBreakMode = .byTruncatingTail
-        nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        nameLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        nameLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        nameLabel.setContentHuggingPriority(.required, for: .horizontal)
+        nameLabel.widthAnchor.constraint(equalToConstant: 150).isActive = true
 
-        valueLabel.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
+        valueLabel.font = .systemFont(ofSize: 10)
         valueLabel.textColor = .secondaryLabelColor
-        valueLabel.alignment = .right
+        valueLabel.alignment = .left
         valueLabel.lineBreakMode = .byTruncatingTail
-        valueLabel.setContentHuggingPriority(.required, for: .horizontal)
-        valueLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        valueLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        valueLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         row.addArrangedSubview(nameLabel)
         row.addArrangedSubview(valueLabel)
+        row.edgeInsets = NSEdgeInsets(top: 4, left: 0, bottom: 4, right: 0)
 
         addSubview(row)
         NSLayoutConstraint.activate([
