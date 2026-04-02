@@ -49,7 +49,7 @@ actor FTPClient {
     // MARK: - Connection
 
     func connect() async throws {
-        Log.info("FTP connecting to \(host):\(port)")
+        await Log.info("FTP connecting to \(host):\(port)")
         let connection = NWConnection(
             host: NWEndpoint.Host(host),
             port: NWEndpoint.Port(rawValue: port)!,
@@ -91,11 +91,10 @@ actor FTPClient {
 
         // Set binary mode
         let _ = try await sendCommand("TYPE I")
-        Log.debug("FTP connected and logged in")
+        await Log.debug("FTP connected and logged in")
     }
 
     func disconnect() {
-        Log.info("FTP disconnecting")
         controlConnection?.cancel()
         controlConnection = nil
     }
@@ -103,7 +102,7 @@ actor FTPClient {
     // MARK: - Directory Operations
 
     func listDirectory(_ path: String) async throws -> [FTPFileEntry] {
-        Log.debug("FTP listDirectory: '\(path)'")
+        await Log.debug("FTP listDirectory: '\(path)'")
         let (dataHost, dataPort) = try await enterPassiveMode()
         let _ = try await sendCommand("CWD \(path)")
         let pwdResp = try await sendCommand("PWD")
@@ -155,7 +154,7 @@ actor FTPClient {
 
         let listing = String(data: rawData, encoding: .utf8) ?? ""
         let entries = parseListResponse(listing, parentPath: currentPath)
-        Log.debug("FTP listed \(entries.count) entries in '\(currentPath)'")
+        await Log.debug("FTP listed \(entries.count) entries in '\(currentPath)'")
         return entries
     }
 
@@ -349,7 +348,7 @@ actor FTPClient {
             throw FTPError.notConnected
         }
 
-        Log.verbose("FTP > \(command)")
+        await Log.verbose("FTP > \(command)")
         let data = Data((command + "\r\n").utf8)
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             connection.send(content: data, completion: .contentProcessed { error in
@@ -362,7 +361,7 @@ actor FTPClient {
         }
 
         let response = try await readResponse()
-        Log.verbose("FTP < \(response.code) \(response.message)")
+        await Log.verbose("FTP < \(response.code) \(response.message)")
         return response
     }
 

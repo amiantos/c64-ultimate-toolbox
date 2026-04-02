@@ -222,7 +222,6 @@ final class BASICScratchpadViewController: NSViewController {
         guard let code = sender.identifier?.rawValue,
               let textView = editorManager.textView else { return }
 
-        let insertionPoint = textView.selectedRange().location
         textView.insertText(code, replacementRange: textView.selectedRange())
 
         // Update the connection's stored code

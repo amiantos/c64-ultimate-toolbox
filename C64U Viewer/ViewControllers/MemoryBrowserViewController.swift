@@ -264,7 +264,6 @@ final class MemoryBrowserViewController: NSViewController {
                 for i in 0..<memoryData.count {
                     if i < originalData.count && memoryData[i] != originalData[i] {
                         let addr = currentAddress + i
-                        let hex = String(format: "%04X", addr)
                         let dataHex = String(format: "%02X", memoryData[i])
                         // Use PUT with data= parameter for single byte writes (works for I/O registers)
                         try await client.writeMemHex(address: addr, dataHex: dataHex)
