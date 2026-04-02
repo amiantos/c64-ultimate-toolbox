@@ -120,6 +120,7 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
             let fileManagerVC = FileManagerViewController(connection: connection)
             let sidebarItem = NSSplitViewItem(sidebarWithViewController: fileManagerVC)
             sidebarItem.minimumThickness = 300
+            sidebarItem.isCollapsed = true
             splitViewController.addSplitViewItem(sidebarItem)
         }
 
