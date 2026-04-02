@@ -542,6 +542,15 @@ final class FileManagerViewController: NSViewController, NSOutlineViewDataSource
 
         // Common actions
         menu.addItem(withTitle: "New Folder", action: #selector(createNewFolder), keyEquivalent: "").target = self
+
+        let diskImageItem = NSMenuItem(title: "New Disk Image", action: nil, keyEquivalent: "")
+        let diskImageMenu = NSMenu()
+        diskImageMenu.addItem(withTitle: "D64 Image…", action: #selector(createD64), keyEquivalent: "").target = self
+        diskImageMenu.addItem(withTitle: "D71 Image…", action: #selector(createD71), keyEquivalent: "").target = self
+        diskImageMenu.addItem(withTitle: "D81 Image…", action: #selector(createD81), keyEquivalent: "").target = self
+        diskImageMenu.addItem(withTitle: "DNP Image…", action: #selector(createDNP), keyEquivalent: "").target = self
+        diskImageItem.submenu = diskImageMenu
+        menu.addItem(diskImageItem)
         if entry != nil {
             menu.addItem(.separator())
             menu.addItem(withTitle: "Copy Path", action: #selector(copyPath), keyEquivalent: "").target = self
@@ -848,6 +857,106 @@ final class FileManagerViewController: NSViewController, NSOutlineViewDataSource
                 do {
                     try await self.ftpClient?.createDirectory(fullPath)
                     // Reload parent
+                    targetNode.children = nil
+                    await self.loadChildren(of: targetNode)
+                    self.outlineView.reloadItem(targetNode, reloadChildren: true)
+                    self.outlineView.expandItem(targetNode)
+                } catch {
+                    self.showError("Error", details: error.localizedDescription)
+                }
+            }
+        }
+    }
+
+    // MARK: - Disk Image Creation
+
+    @objc private func createD64() { createDiskImage(ext: "d64", label: "D64") }
+    @objc private func createD71() { createDiskImage(ext: "d71", label: "D71") }
+    @objc private func createD81() { createDiskImage(ext: "d81", label: "D81") }
+    @objc private func createDNP() { createDiskImage(ext: "dnp", label: "DNP") }
+
+    private func createDiskImage(ext: String, label: String) {
+        guard let client = connection.apiClient, let window = view.window else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "New \(label) Disk Image"
+        alert.informativeText = "Enter a filename for the new disk image."
+        alert.addButton(withTitle: "Create")
+        alert.addButton(withTitle: "Cancel")
+
+        let containerHeight: CGFloat = (ext == "d64" || ext == "dnp") ? 60 : 24
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 250, height: containerHeight))
+
+        let nameField = NSTextField(frame: NSRect(x: 0, y: containerHeight - 24, width: 250, height: 24))
+        nameField.placeholderString = "Filename"
+        nameField.stringValue = "Untitled.\(ext)"
+        container.addSubview(nameField)
+
+        // D64: tracks picker (35 or 40)
+        var tracksPopup: NSPopUpButton?
+        if ext == "d64" {
+            let tracksLabel = NSTextField(labelWithString: "Tracks:")
+            tracksLabel.frame = NSRect(x: 0, y: 0, width: 50, height: 24)
+            container.addSubview(tracksLabel)
+
+            let popup = NSPopUpButton(frame: NSRect(x: 54, y: -2, width: 70, height: 28))
+            popup.addItems(withTitles: ["35", "40"])
+            popup.selectItem(withTitle: "35")
+            container.addSubview(popup)
+            tracksPopup = popup
+        }
+
+        // DNP: tracks field (1–255, required)
+        var tracksField: NSTextField?
+        if ext == "dnp" {
+            let tracksLabel = NSTextField(labelWithString: "Tracks (1–255):")
+            tracksLabel.frame = NSRect(x: 0, y: 0, width: 100, height: 24)
+            container.addSubview(tracksLabel)
+
+            let field = NSTextField(frame: NSRect(x: 104, y: 0, width: 60, height: 24))
+            field.placeholderString = "255"
+            field.stringValue = "255"
+            container.addSubview(field)
+            tracksField = field
+        }
+
+        alert.accessoryView = container
+        let targetNode = selectedDirectoryNode() ?? rootNode
+
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .alertFirstButtonReturn else { return }
+            var name = nameField.stringValue.trimmingCharacters(in: .whitespaces)
+            guard !name.isEmpty else { return }
+
+            // Ensure correct extension
+            if !name.lowercased().hasSuffix(".\(ext)") {
+                name += ".\(ext)"
+            }
+
+            let fullPath = targetNode.path.hasSuffix("/") ? targetNode.path + name : targetNode.path + "/" + name
+
+            Task {
+                do {
+                    switch ext {
+                    case "d64":
+                        let tracks = Int(tracksPopup?.titleOfSelectedItem ?? "35") ?? 35
+                        try await client.createD64(path: fullPath, tracks: tracks)
+                    case "d71":
+                        try await client.createD71(path: fullPath)
+                    case "d81":
+                        try await client.createD81(path: fullPath)
+                    case "dnp":
+                        guard let tracksStr = tracksField?.stringValue,
+                              let tracks = Int(tracksStr), (1...255).contains(tracks) else {
+                            self.showError("Invalid Tracks", details: "DNP requires a track count between 1 and 255.")
+                            return
+                        }
+                        try await client.createDNP(path: fullPath, tracks: tracks)
+                    default:
+                        break
+                    }
+
+                    self.statusLabel.stringValue = "Created \(name)"
                     targetNode.children = nil
                     await self.loadChildren(of: targetNode)
                     self.outlineView.reloadItem(targetNode, reloadChildren: true)

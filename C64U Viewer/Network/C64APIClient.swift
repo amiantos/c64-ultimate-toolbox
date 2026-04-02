@@ -144,6 +144,28 @@ final class C64APIClient: Sendable {
         try await put("/v1/drives/\(drive):reset")
     }
 
+    // MARK: - Disk Image Creation
+
+    func createD64(path: String, tracks: Int = 35) async throws {
+        let encoded = Self.encodeQueryValue(path)
+        try await put("/v1/files/\(encoded):create_d64?tracks=\(tracks)")
+    }
+
+    func createD71(path: String) async throws {
+        let encoded = Self.encodeQueryValue(path)
+        try await put("/v1/files/\(encoded):create_d71")
+    }
+
+    func createD81(path: String) async throws {
+        let encoded = Self.encodeQueryValue(path)
+        try await put("/v1/files/\(encoded):create_d81")
+    }
+
+    func createDNP(path: String, tracks: Int) async throws {
+        let encoded = Self.encodeQueryValue(path)
+        try await put("/v1/files/\(encoded):create_dnp?tracks=\(tracks)")
+    }
+
     // MARK: - Configuration
 
     func fetchConfigCategories() async throws -> [String] {
