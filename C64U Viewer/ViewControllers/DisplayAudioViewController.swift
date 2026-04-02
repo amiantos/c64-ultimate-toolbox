@@ -12,11 +12,12 @@ final class DisplayAudioViewController: NSViewController {
     private var saveAsButton: NSButton!
     private var resetButton: NSButton!
     private var deleteButton: NSButton!
+    private var overlayTintPopup: NSPopUpButton!
 
     init(connection: C64Connection) {
         self.connection = connection
         super.init(nibName: nil, bundle: nil)
-        self.title = "Display & Audio"
+        self.title = "Settings"
     }
 
     @available(*, unavailable)
@@ -127,6 +128,32 @@ final class DisplayAudioViewController: NSViewController {
         addSlider("afterglowStrength", label: "Strength", range: 0...1, to: stack)
         addSlider("afterglowDecaySpeed", label: "Decay Speed", range: 1...15, to: stack)
 
+        addSeparator(to: stack)
+        addSection("Keyboard Overlay", to: stack)
+        addSlider("overlayBgOpacity", label: "Background", range: 0...1, to: stack)
+        addSlider("overlayButtonOpacity", label: "Buttons", range: 0...1, to: stack)
+
+        overlayTintPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        for title in ["White", "Green", "Amber"] {
+            overlayTintPopup.addItem(withTitle: title)
+        }
+        overlayTintPopup.selectItem(at: UserDefaults.standard.integer(forKey: "keyboard_overlay_tint"))
+        overlayTintPopup.target = self
+        overlayTintPopup.action = #selector(overlayTintChanged(_:))
+        overlayTintPopup.translatesAutoresizingMaskIntoConstraints = false
+
+        let tintRow = NSStackView()
+        tintRow.orientation = .horizontal
+        tintRow.spacing = 8
+        tintRow.translatesAutoresizingMaskIntoConstraints = false
+        let tintLabel = NSTextField(labelWithString: "Tint Color")
+        tintLabel.font = .systemFont(ofSize: 11)
+        tintLabel.widthAnchor.constraint(equalToConstant: 100).isActive = true
+        tintRow.addArrangedSubview(tintLabel)
+        tintRow.addArrangedSubview(overlayTintPopup)
+        stack.addArrangedSubview(tintRow)
+        tintRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+
         contentView.addSubview(stack)
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
@@ -231,6 +258,10 @@ final class DisplayAudioViewController: NSViewController {
         switch key {
         case "volume": return connection.volume
         case "balance": return connection.balance
+        case "overlayBgOpacity":
+            return UserDefaults.standard.object(forKey: "keyboard_overlay_bg_opacity") as? Float ?? 0.0
+        case "overlayButtonOpacity":
+            return UserDefaults.standard.object(forKey: "keyboard_overlay_button_opacity") as? Float ?? 1.0
         default: break
         }
         let s = connection.crtSettings
@@ -275,6 +306,18 @@ final class DisplayAudioViewController: NSViewController {
             return
         }
 
+        // Keyboard overlay sliders
+        if key == "overlayBgOpacity" {
+            UserDefaults.standard.set(value, forKey: "keyboard_overlay_bg_opacity")
+            NotificationCenter.default.post(name: .keyboardOverlaySettingsChanged, object: nil)
+            return
+        }
+        if key == "overlayButtonOpacity" {
+            UserDefaults.standard.set(value, forKey: "keyboard_overlay_button_opacity")
+            NotificationCenter.default.post(name: .keyboardOverlaySettingsChanged, object: nil)
+            return
+        }
+
         // CRT sliders
         switch key {
         case "scanlineIntensity": connection.crtSettings.scanlineIntensity = value
@@ -309,6 +352,11 @@ final class DisplayAudioViewController: NSViewController {
         connection.applySettingsChange()
         rebuildPresetPopup()
         updatePresetButtons()
+    }
+
+    @objc private func overlayTintChanged(_ sender: NSPopUpButton) {
+        UserDefaults.standard.set(sender.indexOfSelectedItem, forKey: "keyboard_overlay_tint")
+        NotificationCenter.default.post(name: .keyboardOverlaySettingsChanged, object: nil)
     }
 
     @objc private func maskTypeChanged(_ sender: NSPopUpButton) {

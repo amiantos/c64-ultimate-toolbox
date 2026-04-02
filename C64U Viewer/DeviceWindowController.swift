@@ -70,6 +70,8 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
         videoViewController.onMenuButton = { [weak self] in
             self?.connection.machineAction(.menuButton)
         }
+
+        restoreKeyboardState()
     }
 
     // MARK: - Keyboard Forwarding
@@ -297,9 +299,11 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
         if forwarder.isEnabled {
             forwarder.isEnabled = false
             videoViewController.setKeyboardStripVisible(false)
+            saveKeyboardState(enabled: false)
         } else if UserDefaults.standard.bool(forKey: "c64_keyboard_info_shown") {
             forwarder.isEnabled = true
             videoViewController.setKeyboardStripVisible(true)
+            saveKeyboardState(enabled: true)
         } else {
             let alert = NSAlert()
             alert.messageText = "Keyboard Forwarding"
@@ -310,8 +314,29 @@ final class DeviceWindowController: NSWindowController, NSToolbarDelegate {
                 UserDefaults.standard.set(true, forKey: "c64_keyboard_info_shown")
                 forwarder.isEnabled = true
                 videoViewController.setKeyboardStripVisible(true)
+                saveKeyboardState(enabled: true)
             }
         }
+        refreshToolbarItem(.keyboard)
+    }
+
+    private var keyboardStateKey: String? {
+        guard let client = connection.apiClient else { return nil }
+        return "keyboard_enabled-\(client.baseURL)"
+    }
+
+    private func saveKeyboardState(enabled: Bool) {
+        guard let key = keyboardStateKey else { return }
+        UserDefaults.standard.set(enabled, forKey: key)
+    }
+
+    private func restoreKeyboardState() {
+        guard let key = keyboardStateKey,
+              UserDefaults.standard.bool(forKey: "c64_keyboard_info_shown"),
+              UserDefaults.standard.bool(forKey: key),
+              let forwarder = connection.keyboardForwarder else { return }
+        forwarder.isEnabled = true
+        videoViewController.setKeyboardStripVisible(true)
         refreshToolbarItem(.keyboard)
     }
 

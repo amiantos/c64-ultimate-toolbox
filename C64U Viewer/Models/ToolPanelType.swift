@@ -14,7 +14,7 @@ enum InspectorPanel: String, CaseIterable {
         switch self {
         case .basicScratchpad: "BASIC Scratchpad"
         case .system: "System"
-        case .displayAndAudio: "Display & Audio"
+        case .displayAndAudio: "Settings"
         }
     }
 

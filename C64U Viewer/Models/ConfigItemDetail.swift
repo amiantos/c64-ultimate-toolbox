@@ -40,4 +40,5 @@ enum ConfigControlType {
 
 extension Notification.Name {
     static let driveStatusDidChange = Notification.Name("driveStatusDidChange")
+    static let keyboardOverlaySettingsChanged = Notification.Name("keyboardOverlaySettingsChanged")
 }
