@@ -5,7 +5,8 @@
 import AppKit
 
 let app = NSApplication.shared
-let delegate = AppDelegate()
-nonisolated(unsafe) let unsafeDelegate = delegate
-app.delegate = unsafeDelegate
+MainActor.assumeIsolated {
+    let delegate = AppDelegate()
+    app.delegate = delegate
+}
 _ = NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)
