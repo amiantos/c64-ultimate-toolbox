@@ -5,7 +5,6 @@
 import AppKit
 
 final class StatusBarView: NSView {
-    private let fpsLabel = NSTextField(labelWithString: "0 fps")
     private let recBadge = NSTextField(labelWithString: "REC")
     private let kbBadge = NSTextField(labelWithString: "KB")
 
@@ -19,10 +18,6 @@ final class StatusBarView: NSView {
 
     private func setupViews() {
         wantsLayer = true
-
-        fpsLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
-        fpsLabel.textColor = NSColor.white.withAlphaComponent(0.7)
-        fpsLabel.translatesAutoresizingMaskIntoConstraints = false
 
         recBadge.font = .systemFont(ofSize: 10, weight: .bold)
         recBadge.textColor = .white
@@ -44,23 +39,19 @@ final class StatusBarView: NSView {
 
         addSubview(recBadge)
         addSubview(kbBadge)
-        addSubview(fpsLabel)
 
         NSLayoutConstraint.activate([
             heightAnchor.constraint(equalToConstant: 24),
             recBadge.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             recBadge.centerYAnchor.constraint(equalTo: centerYAnchor),
             recBadge.widthAnchor.constraint(greaterThanOrEqualToConstant: 30),
-            fpsLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-            fpsLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-            kbBadge.trailingAnchor.constraint(equalTo: fpsLabel.leadingAnchor, constant: -6),
+            kbBadge.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             kbBadge.centerYAnchor.constraint(equalTo: centerYAnchor),
             kbBadge.widthAnchor.constraint(greaterThanOrEqualToConstant: 24),
         ])
     }
 
-    func update(fps: Double, isRecording: Bool, isKeyboardActive: Bool) {
-        fpsLabel.stringValue = "\(Int(fps)) fps"
+    func update(isRecording: Bool, isKeyboardActive: Bool) {
         recBadge.isHidden = !isRecording
         kbBadge.isHidden = !isKeyboardActive
     }

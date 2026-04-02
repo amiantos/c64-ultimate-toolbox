@@ -113,7 +113,6 @@ final class VideoViewController: NSViewController {
             guard let self else { return }
             let keyboardActive = self.connection.keyboardForwarder?.isEnabled == true
             self.statusBar.update(
-                fps: self.connection.framesPerSecond,
                 isRecording: self.connection.isRecording,
                 isKeyboardActive: keyboardActive
             )
