@@ -1,0 +1,96 @@
+{
+  "fill" : {
+    "automatic-gradient" : "display-p3:0.13333,0.12549,0.51373,1.00000"
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "fill" : "none",
+          "glass" : false,
+          "image-name" : "C64U Viewer Icon-WhiteText.svg",
+          "name" : "C64U Viewer Icon-WhiteText"
+        },
+        {
+          "fill-specializations" : [
+            {
+              "value" : {
+                "linear-gradient" : [
+                  "display-p3:0.30213,0.29613,0.64909,1.00000",
+                  "srgb:0.13333,0.12549,0.51373,1.00000"
+                ],
+                "orientation" : {
+                  "start" : {
+                    "x" : 0.5,
+                    "y" : -0.589358997781274
+                  },
+                  "stop" : {
+                    "x" : 0.5,
+                    "y" : 1.5039323455706266
+                  }
+                }
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : "none"
+            }
+          ],
+          "glass" : false,
+          "image-name" : "C64U Viewer Icon-Shadow.svg",
+          "name" : "C64U Viewer Icon-Shadow"
+        },
+        {
+          "fill-specializations" : [
+            {
+              "value" : "none"
+            },
+            {
+              "appearance" : "dark",
+              "value" : "none"
+            },
+            {
+              "appearance" : "tinted",
+              "value" : "automatic"
+            }
+          ],
+          "glass" : false,
+          "image-name" : "C64U Viewer Icon-Text.svg",
+          "name" : "C64U Viewer Icon-Text"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "glass" : false,
+          "hidden" : false,
+          "image-name" : "C64U Viewer Icon-Stripes1.svg",
+          "name" : "C64U Viewer Icon-Stripes1"
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
