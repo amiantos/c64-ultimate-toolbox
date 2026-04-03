@@ -55,7 +55,7 @@ final class BASICScratchpadViewController: NSViewController {
         let statusBar = NSStackView(views: [errorLabel, lineCountLabel])
         statusBar.orientation = .horizontal
         statusBar.spacing = 6
-        statusBar.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
+        statusBar.edgeInsets = NSEdgeInsets(top: 4, left: 16, bottom: 4, right: 8)
         statusBar.translatesAutoresizingMaskIntoConstraints = false
 
         container.addSubview(scrollView)

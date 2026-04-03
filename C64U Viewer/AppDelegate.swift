@@ -39,6 +39,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, DeviceWindowController
         fileMenu.addItem(withTitle: "New BASIC Scratchpad", action: #selector(newBASICScratchpad), keyEquivalent: "n")
         fileMenu.addItem(withTitle: "Open Device…", action: #selector(showOpenDeviceWindow), keyEquivalent: "o")
         fileMenu.addItem(.separator())
+
+        // BASIC Scratchpad file operations (auto-disable when no scratchpad is key)
+        fileMenu.addItem(withTitle: "Open File…", action: #selector(BASICScratchpadViewController.openFile), keyEquivalent: "o")
+        fileMenu.items.last?.keyEquivalentModifierMask = [.command, .shift]
+        fileMenu.addItem(.separator())
+        fileMenu.addItem(withTitle: "Save", action: #selector(BASICScratchpadViewController.saveFile), keyEquivalent: "s")
+        fileMenu.addItem(withTitle: "Save As…", action: #selector(BASICScratchpadViewController.saveFileAs), keyEquivalent: "s")
+        fileMenu.items.last?.keyEquivalentModifierMask = [.command, .shift]
+        fileMenu.addItem(.separator())
+
+        let samplesItem = NSMenuItem(title: "New File From Template", action: nil, keyEquivalent: "")
+        let samplesMenu = NSMenu()
+        for sample in BASICSamples.all {
+            let item = NSMenuItem(title: sample.name, action: #selector(BASICScratchpadViewController.loadSampleFromMenu(_:)), keyEquivalent: "")
+            item.representedObject = sample
+            samplesMenu.addItem(item)
+        }
+        samplesItem.submenu = samplesMenu
+        fileMenu.addItem(samplesItem)
+        fileMenu.addItem(.separator())
+
         fileMenu.addItem(withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         fileMenuItem.submenu = fileMenu
         mainMenu.addItem(fileMenuItem)
