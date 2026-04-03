@@ -13,7 +13,7 @@ final class InspectorContainerViewController: NSViewController {
     var onPanelChanged: ((InspectorPanel) -> Void)?
     private(set) var activePanel: InspectorPanel = .system
 
-    private var segmentedControl: NSSegmentedControl!
+    private var segmentedControl: PillSegmentedControl!
     private var actionBar: NSStackView!
     private var actionBarSeparator: NSBox!
     private var contentContainer: NSView!
@@ -33,10 +33,10 @@ final class InspectorContainerViewController: NSViewController {
         container.backgroundColor = .controlBackgroundColor
 
         // Segmented control for panel switching
-        segmentedControl = NSSegmentedControl(labels: InspectorPanel.allCases.map(\.label), trackingMode: .selectOne, target: self, action: #selector(segmentChanged(_:)))
+        segmentedControl = PillSegmentedControl(labels: InspectorPanel.allCases.map(\.label))
         segmentedControl.selectedSegment = InspectorPanel.allCases.firstIndex(of: activePanel) ?? 0
-        segmentedControl.segmentStyle = .automatic
-        segmentedControl.translatesAutoresizingMaskIntoConstraints = false
+        segmentedControl.target = self
+        segmentedControl.action = #selector(segmentChanged(_:))
 
         // Action bar for tool-specific buttons (empty when not needed)
         actionBar = NSStackView()
@@ -61,7 +61,8 @@ final class InspectorContainerViewController: NSViewController {
 
         NSLayoutConstraint.activate([
             segmentedControl.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor, constant: 8),
-            segmentedControl.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            segmentedControl.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
+            segmentedControl.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12),
 
             actionBar.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: 4),
             actionBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
@@ -91,7 +92,7 @@ final class InspectorContainerViewController: NSViewController {
 
     // MARK: - Panel Switching
 
-    @objc private func segmentChanged(_ sender: NSSegmentedControl) {
+    @objc private func segmentChanged(_ sender: PillSegmentedControl) {
         let panels = InspectorPanel.allCases
         guard sender.selectedSegment >= 0, sender.selectedSegment < panels.count else { return }
         let panel = panels[sender.selectedSegment]

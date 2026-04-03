@@ -31,8 +31,11 @@ final class OpenDeviceWindowController: NSWindowController {
     private let audioPortField = NSTextField()
     private let listenButton = NSButton(title: "Listen", target: nil, action: nil)
 
-    // Tab view
-    private let tabView = NSTabView()
+    // Tab switching
+    private var segmentedControl: PillSegmentedControl!
+    private var tabContainer: NSView!
+    private var toolboxView: NSView!
+    private var viewerView: NSView!
 
     init() {
         let window = NSWindow(
@@ -57,25 +60,49 @@ final class OpenDeviceWindowController: NSWindowController {
     private func setupUI() {
         guard let contentView = window?.contentView else { return }
 
-        tabView.translatesAutoresizingMaskIntoConstraints = false
+        segmentedControl = PillSegmentedControl(labels: ["Toolbox", "Viewer"])
+        segmentedControl.target = self
+        segmentedControl.action = #selector(tabChanged(_:))
 
-        let toolboxTab = NSTabViewItem(identifier: "toolbox")
-        toolboxTab.label = "Toolbox"
-        toolboxTab.view = makeToolboxView()
+        tabContainer = NSView()
+        tabContainer.translatesAutoresizingMaskIntoConstraints = false
 
-        let viewerTab = NSTabViewItem(identifier: "viewer")
-        viewerTab.label = "Viewer"
-        viewerTab.view = makeViewerView()
+        toolboxView = makeToolboxView()
+        viewerView = makeViewerView()
 
-        tabView.addTabViewItem(toolboxTab)
-        tabView.addTabViewItem(viewerTab)
+        contentView.addSubview(segmentedControl)
+        contentView.addSubview(tabContainer)
 
-        contentView.addSubview(tabView)
         NSLayoutConstraint.activate([
-            tabView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
-            tabView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            tabView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
-            tabView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+            segmentedControl.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+            segmentedControl.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+            segmentedControl.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+
+            tabContainer.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: 12),
+            tabContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+            tabContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+            tabContainer.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+        ])
+
+        showTab(0)
+    }
+
+    @objc private func tabChanged(_ sender: PillSegmentedControl) {
+        showTab(sender.selectedSegment)
+    }
+
+    private func showTab(_ index: Int) {
+        toolboxView.removeFromSuperview()
+        viewerView.removeFromSuperview()
+
+        let activeView = index == 0 ? toolboxView! : viewerView!
+        activeView.translatesAutoresizingMaskIntoConstraints = false
+        tabContainer.addSubview(activeView)
+        NSLayoutConstraint.activate([
+            activeView.topAnchor.constraint(equalTo: tabContainer.topAnchor),
+            activeView.leadingAnchor.constraint(equalTo: tabContainer.leadingAnchor),
+            activeView.trailingAnchor.constraint(equalTo: tabContainer.trailingAnchor),
+            activeView.bottomAnchor.constraint(equalTo: tabContainer.bottomAnchor),
         ])
     }
 

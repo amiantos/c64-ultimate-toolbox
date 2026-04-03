@@ -158,38 +158,40 @@ final class DisplayAudioViewController: NSViewController {
         addSlider("afterglowStrength", label: "Strength", range: 0...1, to: stack)
         addSlider("afterglowDecaySpeed", label: "Decay Speed", range: 1...15, to: stack)
 
-        addSeparator(to: stack)
+        if connection.connectionMode != .viewer {
+            addSeparator(to: stack)
 
-        // ── Keyboard Overlay ──
-        addSection("Keyboard Overlay", to: stack)
-        addSlider("overlayBgOpacity", label: "Background", range: 0...1, to: stack)
-        addSlider("overlayButtonOpacity", label: "Buttons", range: 0...1, to: stack)
+            // ── Keyboard Overlay ──
+            addSection("Keyboard Overlay", to: stack)
+            addSlider("overlayBgOpacity", label: "Background", range: 0...1, to: stack)
+            addSlider("overlayButtonOpacity", label: "Buttons", range: 0...1, to: stack)
 
-        overlayTintPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-        overlayTintPopup.controlSize = .small
-        overlayTintPopup.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        for title in ["White", "Green", "Amber"] {
-            overlayTintPopup.addItem(withTitle: title)
+            overlayTintPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+            overlayTintPopup.controlSize = .small
+            overlayTintPopup.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+            for title in ["White", "Green", "Amber"] {
+                overlayTintPopup.addItem(withTitle: title)
+            }
+            overlayTintPopup.selectItem(at: UserDefaults.standard.integer(forKey: "keyboard_overlay_tint"))
+            overlayTintPopup.target = self
+            overlayTintPopup.action = #selector(overlayTintChanged(_:))
+            overlayTintPopup.translatesAutoresizingMaskIntoConstraints = false
+            overlayTintPopup.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+            let tintRow = NSStackView()
+            tintRow.orientation = .horizontal
+            tintRow.distribution = .fill
+            tintRow.spacing = 8
+            tintRow.translatesAutoresizingMaskIntoConstraints = false
+            let tintLabel = NSTextField(labelWithString: "Tint Color")
+            tintLabel.font = .systemFont(ofSize: 11)
+            tintLabel.setContentHuggingPriority(.required, for: .horizontal)
+            tintLabel.widthAnchor.constraint(equalToConstant: 100).isActive = true
+            tintRow.addArrangedSubview(tintLabel)
+            tintRow.addArrangedSubview(overlayTintPopup)
+            stack.addArrangedSubview(tintRow)
+            tintRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
-        overlayTintPopup.selectItem(at: UserDefaults.standard.integer(forKey: "keyboard_overlay_tint"))
-        overlayTintPopup.target = self
-        overlayTintPopup.action = #selector(overlayTintChanged(_:))
-        overlayTintPopup.translatesAutoresizingMaskIntoConstraints = false
-        overlayTintPopup.setContentHuggingPriority(.defaultLow, for: .horizontal)
-
-        let tintRow = NSStackView()
-        tintRow.orientation = .horizontal
-        tintRow.distribution = .fill
-        tintRow.spacing = 8
-        tintRow.translatesAutoresizingMaskIntoConstraints = false
-        let tintLabel = NSTextField(labelWithString: "Tint Color")
-        tintLabel.font = .systemFont(ofSize: 11)
-        tintLabel.setContentHuggingPriority(.required, for: .horizontal)
-        tintLabel.widthAnchor.constraint(equalToConstant: 100).isActive = true
-        tintRow.addArrangedSubview(tintLabel)
-        tintRow.addArrangedSubview(overlayTintPopup)
-        stack.addArrangedSubview(tintRow)
-        tintRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
 
         contentView.addSubview(stack)
         NSLayoutConstraint.activate([

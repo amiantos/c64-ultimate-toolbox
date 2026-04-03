@@ -293,9 +293,7 @@ final class SystemViewController: NSViewController {
         imageLabel.font = .systemFont(ofSize: 10)
         imageLabel.lineBreakMode = .byTruncatingMiddle
 
-        let ejectButton = NSButton(image: NSImage(systemSymbolName: "eject.fill", accessibilityDescription: "Eject")!, target: self, action: #selector(ejectDrive(_:)))
-        ejectButton.bezelStyle = .toolbar
-        ejectButton.controlSize = .mini
+        let ejectButton = PillButton(symbolName: "eject.fill", accessibilityDescription: "Eject", target: self, action: #selector(ejectDrive(_:)))
         ejectButton.tag = drive == "A" ? 0 : 1
 
         row.addArrangedSubview(icon)
