@@ -3,9 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import Foundation
-import Observation
 
-@Observable
 final class C64KeyboardForwarder {
     var isEnabled = false {
         didSet {
@@ -90,13 +88,16 @@ final class C64KeyboardForwarder {
 
                     // Write PETSCII byte to buffer at position
                     let writeAddress = bufferAddress + count
-                    try await client.writeMem(address: writeAddress, data: Data([petscii]))
+                    try await client.writeMemHex(address: writeAddress, dataHex: String(format: "%02X", petscii))
 
                     // Increment buffer counter
-                    try await client.writeMem(address: counterAddress, data: Data([UInt8(count + 1)]))
+                    try await client.writeMemHex(address: counterAddress, dataHex: String(format: "%02X", count + 1))
                 }
             } catch {
-                print("Keyboard inject error: \(error.localizedDescription)")
+                print("Keyboard inject error: \(error)")
+                print("  readMem address: \(String(format: "%04X", self.counterAddress))")
+                print("  writeMem address: \(String(format: "%04X", self.bufferAddress))")
+                print("  client baseURL: \(client.baseURL)")
             }
             isSending = false
         }

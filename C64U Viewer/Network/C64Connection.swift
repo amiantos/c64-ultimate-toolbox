@@ -2,10 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+import CoreWLAN
 import Foundation
-import Observation
+import IOKit.pwr_mgt
 
-@Observable
 final class C64Connection {
     var videoPort: UInt16 = 11000
     var audioPort: UInt16 = 11001
@@ -40,9 +40,13 @@ final class C64Connection {
     }
     var isMuted = false
 
+    // Tool panel state
+    var fileManagerCurrentPath: String = "/"
+
     private(set) var framesPerSecond: Double = 0
     private var frameCount = 0
     private var fpsTimer: DispatchSourceTimer?
+    private var sleepAssertionID: IOPMAssertionID = 0
 
     let frameAssembler = FrameAssembler()
     let videoReceiver: UDPVideoReceiver
@@ -78,9 +82,13 @@ final class C64Connection {
         if UserDefaults.standard.object(forKey: "c64_balance") != nil {
             balance = UserDefaults.standard.float(forKey: "c64_balance")
         }
+        // Apply saved audio settings to audio player (didSet doesn't fire during init)
+        audioPlayer.volume = volume
+        audioPlayer.balance = balance
 
         // Load settings from preset manager
         crtSettings = presetManager.settings(for: presetManager.selectedIdentifier)
+        renderer.crtSettings = crtSettings
 
         mediaCapture.renderer = renderer
         mediaCapture.audioPlayer = audioPlayer
@@ -120,8 +128,11 @@ final class C64Connection {
 
     // MARK: - Toolbox Mode
 
-    func connectToolbox(ip: String, password: String?, savePassword: Bool) {
-        guard !isConnected else { return }
+    func connectToolbox(ip: String, password: String?, savePassword: Bool, completion: ((Bool) -> Void)? = nil) {
+        guard !isConnected else {
+            completion?(false)
+            return
+        }
 
         connectionMode = .toolbox
         connectionError = nil
@@ -133,7 +144,7 @@ final class C64Connection {
             do {
                 let info = try await client.fetchInfo()
                 self.deviceInfo = info
-                print("C64U device: \(info.product) v\(info.firmwareVersion) (\(info.hostname))")
+                Log.info("Device: \(info.product) v\(info.firmwareVersion) (\(info.hostname))")
 
                 // Connection verified — start everything
                 keyboardForwarder = C64KeyboardForwarder(client: client)
@@ -144,20 +155,23 @@ final class C64Connection {
                 startFPSCounter()
                 recentConnections.addToolbox(ipAddress: ip, password: password, savePassword: savePassword)
                 startStreams()
+                completion?(true)
             } catch let error as C64APIError {
                 if case .httpError(403) = error {
                     self.connectionError = "Incorrect password"
                 } else {
                     self.connectionError = error.localizedDescription
                 }
-                print("C64U API error: \(error.localizedDescription)")
+                Log.error("API error: \(error.localizedDescription)")
                 apiClient = nil
                 connectionMode = nil
+                completion?(false)
             } catch {
                 self.connectionError = error.localizedDescription
-                print("C64U API error: \(error.localizedDescription)")
+                Log.error("API error: \(error.localizedDescription)")
                 apiClient = nil
                 connectionMode = nil
+                completion?(false)
             }
         }
     }
@@ -171,11 +185,12 @@ final class C64Connection {
             mediaCapture.stopRecording()
         }
 
-        // Stop streams via API in Toolbox Mode
+        // Stop streams via API in Toolbox Mode — capture client before nilling it
         if connectionMode == .toolbox, let client = apiClient {
+            let capturedClient = client
             Task {
-                try? await client.stopStream("video")
-                try? await client.stopStream("audio")
+                try? await capturedClient.stopStream("video")
+                try? await capturedClient.stopStream("audio")
             }
         }
 
@@ -191,6 +206,8 @@ final class C64Connection {
         connectionError = nil
         streamsActive = false
         isWaitingForReboot = false
+        allowSleep()
+
         fpsTimer?.cancel()
         fpsTimer = nil
         framesPerSecond = 0
@@ -199,9 +216,13 @@ final class C64Connection {
     // MARK: - Toolbox Actions
 
     var streamsActive = false
+    var isPaused = false
 
-    func startStreams() {
-        guard let client = apiClient else { return }
+    func startStreams(completion: ((Bool) -> Void)? = nil) {
+        guard let client = apiClient else {
+            completion?(false)
+            return
+        }
         Task {
             do {
                 if let localIP = getLocalIPAddress() {
@@ -209,25 +230,44 @@ final class C64Connection {
                     try await client.startStream("audio", clientIP: localIP, port: audioPort)
                     self.streamsActive = true
                     self.connectionError = nil
+                    self.preventSleep()
+                    completion?(true)
+                } else {
+                    completion?(false)
                 }
+            } catch let error as C64APIError {
+                Log.error("Stream start error: \(error.localizedDescription)")
+                if case .httpError(500) = error {
+                    self.connectionError = "Unable to start streams. Make sure your Ultimate device is connected to Ethernet."
+                } else {
+                    self.connectionError = error.localizedDescription
+                }
+                completion?(false)
             } catch {
-                print("C64U stream start error: \(error.localizedDescription)")
+                Log.error("Stream start error: \(error.localizedDescription)")
                 self.connectionError = error.localizedDescription
+                completion?(false)
             }
         }
     }
 
-    func stopStreams() {
-        guard let client = apiClient else { return }
+    func stopStreams(completion: ((Bool) -> Void)? = nil) {
+        guard let client = apiClient else {
+            completion?(false)
+            return
+        }
         Task {
             do {
                 try await client.stopStream("video")
                 try await client.stopStream("audio")
                 self.streamsActive = false
                 self.connectionError = nil
+                self.allowSleep()
+                completion?(true)
             } catch {
-                print("C64U stream stop error: \(error.localizedDescription)")
+                Log.error("Stream stop error: \(error.localizedDescription)")
                 self.connectionError = error.localizedDescription
+                completion?(false)
             }
         }
     }
@@ -238,11 +278,12 @@ final class C64Connection {
             do {
                 switch type {
                 case .sid: try await client.runSID(data: data)
+                case .mod: try await client.runMOD(data: data)
                 case .prg: try await client.runPRG(data: data)
                 case .crt: try await client.runCRT(data: data)
                 }
             } catch {
-                print("C64U runner error: \(error.localizedDescription)")
+                Log.error("Runner error: \(error.localizedDescription)")
                 self.connectionError = error.localizedDescription
             }
         }
@@ -250,7 +291,7 @@ final class C64Connection {
 
     var isWaitingForReboot = false
 
-    func machineAction(_ action: MachineAction) {
+    func machineAction(_ action: MachineAction, completion: (() -> Void)? = nil) {
         guard let client = apiClient else { return }
         Task {
             do {
@@ -259,7 +300,15 @@ final class C64Connection {
                 case .reboot: try await client.machineReboot()
                 case .powerOff: try await client.machinePowerOff()
                 case .menuButton: try await client.menuButton()
+                case .pause:
+                    try await client.machinePause()
+                    self.isPaused = true
+                case .resume:
+                    try await client.machineResume()
+                    self.isPaused = false
                 }
+
+                completion?()
 
                 if action == .reboot {
                     await waitForDeviceAndRestartStreams(client: client)
@@ -267,7 +316,7 @@ final class C64Connection {
                     disconnect()
                 }
             } catch {
-                print("C64U machine error: \(error.localizedDescription)")
+                Log.error("Machine action error: \(error.localizedDescription)")
                 self.connectionError = error.localizedDescription
             }
         }
@@ -316,6 +365,24 @@ final class C64Connection {
         }
     }
 
+    // MARK: - Sleep Prevention
+
+    private func preventSleep() {
+        guard sleepAssertionID == 0 else { return }
+        IOPMAssertionCreateWithName(
+            kIOPMAssertionTypeNoDisplaySleep as CFString,
+            IOPMAssertionLevel(kIOPMAssertionLevelOn),
+            "C64 Ultimate Toolbox is streaming" as CFString,
+            &sleepAssertionID
+        )
+    }
+
+    private func allowSleep() {
+        guard sleepAssertionID != 0 else { return }
+        IOPMAssertionRelease(sleepAssertionID)
+        sleepAssertionID = 0
+    }
+
     // MARK: - Private
 
     private func startFPSCounter() {
@@ -330,36 +397,12 @@ final class C64Connection {
         fpsTimer = timer
     }
 
-    func getLocalIPAddress() -> String? {
-        var address: String?
-        var ifaddr: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&ifaddr) == 0, let firstAddr = ifaddr else { return nil }
-        defer { freeifaddrs(ifaddr) }
-
-        for ptr in sequence(first: firstAddr, next: { $0.pointee.ifa_next }) {
-            let flags = Int32(ptr.pointee.ifa_flags)
-            let addr = ptr.pointee.ifa_addr.pointee
-
-            guard (flags & (IFF_UP | IFF_RUNNING)) != 0,
-                  (flags & IFF_LOOPBACK) == 0,
-                  addr.sa_family == UInt8(AF_INET) else { continue }
-
-            var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            if getnameinfo(ptr.pointee.ifa_addr, socklen_t(addr.sa_len),
-                           &hostname, socklen_t(hostname.count),
-                           nil, 0, NI_NUMERICHOST) == 0 {
-                address = String(cString: hostname)
-                break
-            }
-        }
-        return address
-    }
 }
 
 enum RunnerType {
-    case sid, prg, crt
+    case sid, mod, prg, crt
 }
 
 enum MachineAction: Equatable {
-    case reset, reboot, powerOff, menuButton
+    case reset, reboot, powerOff, menuButton, pause, resume
 }
