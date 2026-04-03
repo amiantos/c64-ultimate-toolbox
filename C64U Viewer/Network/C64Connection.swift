@@ -235,6 +235,14 @@ final class C64Connection {
                 } else {
                     completion?(false)
                 }
+            } catch let error as C64APIError {
+                Log.error("Stream start error: \(error.localizedDescription)")
+                if case .httpError(500) = error {
+                    self.connectionError = "Unable to start streams. Make sure your Ultimate device is connected to Ethernet."
+                } else {
+                    self.connectionError = error.localizedDescription
+                }
+                completion?(false)
             } catch {
                 Log.error("Stream start error: \(error.localizedDescription)")
                 self.connectionError = error.localizedDescription

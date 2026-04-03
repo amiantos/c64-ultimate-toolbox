@@ -4,6 +4,7 @@
 
 import Foundation
 import Network
+import os
 
 struct DiscoveredDevice {
     let ipAddress: String
@@ -115,28 +116,25 @@ final class DeviceScanner {
                 using: .tcp
             )
             let queue = DispatchQueue(label: "port-check")
-            var resumed = false
+            let resumed = AtomicFlag()
 
             connection.stateUpdateHandler = { state in
-                guard !resumed else { return }
+                guard resumed.testAndSet() else { return }
                 switch state {
                 case .ready:
-                    resumed = true
                     connection.cancel()
                     continuation.resume(returning: true)
                 case .failed, .cancelled:
-                    resumed = true
                     continuation.resume(returning: false)
                 default:
-                    break
+                    resumed.reset()
                 }
             }
 
             connection.start(queue: queue)
 
             queue.asyncAfter(deadline: .now() + timeout) {
-                guard !resumed else { return }
-                resumed = true
+                guard resumed.testAndSet() else { return }
                 connection.cancel()
                 continuation.resume(returning: false)
             }
@@ -145,5 +143,23 @@ final class DeviceScanner {
 
     private func getLocalIP() -> String? {
         getLocalIPAddress()
+    }
+}
+
+/// A thread-safe flag backed by os_unfair_lock, usable from Sendable closures.
+private final class AtomicFlag: @unchecked Sendable {
+    private let _lock = OSAllocatedUnfairLock(initialState: false)
+
+    /// Returns `true` if the flag was unset (and is now set). Returns `false` if already set.
+    nonisolated func testAndSet() -> Bool {
+        _lock.withLock { flag in
+            if flag { return false }
+            flag = true
+            return true
+        }
+    }
+
+    nonisolated func reset() {
+        _lock.withLock { $0 = false }
     }
 }

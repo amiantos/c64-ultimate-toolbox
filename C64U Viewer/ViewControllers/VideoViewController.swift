@@ -11,6 +11,7 @@ final class VideoViewController: NSViewController {
     private var statusBar: StatusBarView!
     private var keyStripView: KeyStripView?
     private var statusTimer: DispatchSourceTimer?
+    private var errorOverlay: NSTextField!
 
     private let aspectRatio: CGFloat = 384.0 / 272.0
 
@@ -39,13 +40,25 @@ final class VideoViewController: NSViewController {
         statusBar = StatusBarView()
         statusBar.translatesAutoresizingMaskIntoConstraints = false
 
+        errorOverlay = NSTextField(wrappingLabelWithString: "")
+        errorOverlay.translatesAutoresizingMaskIntoConstraints = false
+        errorOverlay.font = .systemFont(ofSize: 13)
+        errorOverlay.textColor = .white
+        errorOverlay.alignment = .center
+        errorOverlay.isHidden = true
+
         container.addSubview(mtkView)
+        container.addSubview(errorOverlay)
         container.addSubview(statusBar)
 
         NSLayoutConstraint.activate([
             statusBar.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             statusBar.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             statusBar.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+
+            errorOverlay.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            errorOverlay.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            errorOverlay.widthAnchor.constraint(lessThanOrEqualTo: container.widthAnchor, constant: -40),
         ])
 
         self.view = container
@@ -116,6 +129,13 @@ final class VideoViewController: NSViewController {
                 isRecording: self.connection.isRecording,
                 isKeyboardActive: keyboardActive
             )
+
+            if let error = self.connection.connectionError {
+                self.errorOverlay.stringValue = error
+                self.errorOverlay.isHidden = false
+            } else {
+                self.errorOverlay.isHidden = true
+            }
         }
         timer.resume()
         statusTimer = timer
