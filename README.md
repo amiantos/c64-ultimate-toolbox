@@ -31,12 +31,11 @@ More screenshots: [File manager](screenshots/C64%20Ultimate%20Toolbox%20Screensh
 - Toolbox Mode requires FTP File Service and Web Remote Control Service enabled on the device
 
 ## Download
-- [Download C64 Ultimate Toolbox for macOS 26 and later](https://amiantos.s3.amazonaws.com/c64-ultimate-toolbox-v2.0.zip)
+- [Download C64 Ultimate Toolbox v2.0 for macOS 26 and later](https://amiantos.s3.amazonaws.com/c64-ultimate-toolbox-v2.0.zip)
 - Or, [Purchase C64 Ultimate Toolbox on the App Store](https://apps.apple.com/us/app/c64-ultimate-toolbox/id6760209871?mt=12) for automatic updates.
 
-## Download
-- [Download C64 Ultimate Toolbox for macOS 14.6 and later](https://amiantos.s3.amazonaws.com/c64-ultimate-toolbox-v1.0.zip)
-- Or, [Purchase C64 Ultimate Toolbox on the App Store](https://apps.apple.com/us/app/c64-ultimate-toolbox/id6760209871?mt=12) for automatic updates.
+## Download (For Older Macs)
+- [Download C64 Ultimate Toolbox v1.0 for macOS 14.6 and later](https://amiantos.s3.amazonaws.com/c64-ultimate-toolbox-v1.0.zip)
 
 ## Building
 
