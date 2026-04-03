@@ -318,15 +318,26 @@ final class OpenDeviceWindowController: NSWindowController, NSWindowDelegate {
             discoveredDevicesStack.addArrangedSubview(label)
         } else {
             for device in discoveredDevices {
-                let button = NSButton(
-                    title: "\(device.info.product) — \(device.info.hostname) (\(device.ipAddress))",
+                var title: String
+                if let info = device.info {
+                    title = "\(info.product) — \(info.hostname) (\(device.ipAddress))"
+                } else {
+                    title = "Ultimate Device (\(device.ipAddress))"
+                }
+                if device.requiresPassword { title += " 🔒" }
+                if !device.ftpAvailable { title += " ⚠️ FTP disabled" }
+
+                let button = PillButton(
+                    title: title,
                     target: self,
                     action: #selector(connectDiscoveredDevice(_:))
                 )
-                button.bezelStyle = .inline
-                button.controlSize = .small
                 button.identifier = NSUserInterfaceItemIdentifier(device.ipAddress)
-                button.translatesAutoresizingMaskIntoConstraints = false
+
+                if !device.ftpAvailable {
+                    button.isEnabled = false
+                }
+
                 discoveredDevicesStack.addArrangedSubview(button)
             }
         }
@@ -347,7 +358,7 @@ final class OpenDeviceWindowController: NSWindowController, NSWindowDelegate {
         attemptConnection(ip: ip, password: nil, savePassword: false)
     }
 
-    private func attemptConnection(ip: String, password: String?, savePassword: Bool) {
+    private func attemptConnection(ip: String, password: String?, savePassword: Bool, triedSavedPassword: Bool = false) {
         let connection = C64Connection()
         connection.connectToolbox(ip: ip, password: password, savePassword: savePassword) { [weak self] success in
             guard let self else { return }
@@ -355,7 +366,14 @@ final class OpenDeviceWindowController: NSWindowController, NSWindowDelegate {
                 self.stopAutoScan()
                 self.delegate?.openDeviceWindowController(self, didConnectWith: connection)
             } else if connection.connectionError == "Incorrect password" {
-                self.showPasswordModal(for: ip)
+                // Try saved password before prompting
+                if !triedSavedPassword,
+                   let session = self.recentConnections.toolboxSessions.first(where: { $0.ipAddress == ip && $0.savePassword }),
+                   let savedPassword = session.password {
+                    self.attemptConnection(ip: ip, password: savedPassword, savePassword: true, triedSavedPassword: true)
+                } else {
+                    self.showPasswordModal(for: ip)
+                }
             } else {
                 self.toolboxErrorLabel.stringValue = connection.connectionError ?? "Connection failed"
                 self.toolboxErrorLabel.isHidden = false

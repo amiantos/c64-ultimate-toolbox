@@ -186,7 +186,7 @@ final class FileManagerViewController: NSViewController, NSOutlineViewDataSource
         }
 
         let host = String(client.baseURL.dropFirst("http://".count))
-        ftpClient = FTPClient(host: host)
+        ftpClient = FTPClient(host: host, password: client.password)
 
         Task {
             do {

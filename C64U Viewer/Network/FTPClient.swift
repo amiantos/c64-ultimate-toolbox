@@ -41,9 +41,12 @@ actor FTPClient {
         }
     }
 
-    init(host: String, port: UInt16 = 21) {
+    private let password: String?
+
+    init(host: String, port: UInt16 = 21, password: String? = nil) {
         self.host = host
         self.port = port
+        self.password = password
     }
 
     // MARK: - Connection
@@ -80,10 +83,12 @@ actor FTPClient {
             throw FTPError.commandFailed(greeting.code, greeting.message)
         }
 
-        // Anonymous login
-        let userResp = try await sendCommand("USER anonymous")
+        // Login
+        let user = password != nil ? "" : "anonymous"
+        let pass = password ?? "anonymous@"
+        let userResp = try await sendCommand("USER \(user)")
         if userResp.code == 331 {
-            let passResp = try await sendCommand("PASS anonymous@")
+            let passResp = try await sendCommand("PASS \(pass)")
             guard passResp.code == 230 else {
                 throw FTPError.commandFailed(passResp.code, passResp.message)
             }

@@ -3,10 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import Foundation
+import Network
 
 struct DiscoveredDevice {
     let ipAddress: String
-    let info: DeviceInfo
+    let info: DeviceInfo?
+    var requiresPassword: Bool
+    var ftpAvailable: Bool
 }
 
 final class DeviceScanner {
@@ -49,12 +52,24 @@ final class DeviceScanner {
                     let url = URL(string: "http://\(ip)/v1/info")!
                     let (data, response) = try await session.data(from: url)
 
-                    guard let http = response as? HTTPURLResponse,
-                          (200...299).contains(http.statusCode) else { return }
+                    guard let http = response as? HTTPURLResponse else { return }
 
-                    let info = try JSONDecoder().decode(DeviceInfo.self, from: data)
-                    DispatchQueue.main.async {
-                        onFound(DiscoveredDevice(ipAddress: ip, info: info))
+                    if http.statusCode == 403 {
+                        // Password-protected device — still discoverable
+                        let ftpAvailable = await self.checkPort(host: ip, port: 21)
+                        let device = DiscoveredDevice(
+                            ipAddress: ip, info: nil,
+                            requiresPassword: true, ftpAvailable: ftpAvailable
+                        )
+                        DispatchQueue.main.async { onFound(device) }
+                    } else if (200...299).contains(http.statusCode) {
+                        let info = try JSONDecoder().decode(DeviceInfo.self, from: data)
+                        let ftpAvailable = await self.checkPort(host: ip, port: 21)
+                        let device = DiscoveredDevice(
+                            ipAddress: ip, info: info,
+                            requiresPassword: false, ftpAvailable: ftpAvailable
+                        )
+                        DispatchQueue.main.async { onFound(device) }
                     }
                 } catch {
                     // Not a C64U device or unreachable — ignore
@@ -88,6 +103,44 @@ final class DeviceScanner {
             task.cancel()
         }
         scanTasks.removeAll()
+    }
+
+    // MARK: - Helpers
+
+    private func checkPort(host: String, port: UInt16, timeout: TimeInterval = 1.5) async -> Bool {
+        await withCheckedContinuation { continuation in
+            let connection = NWConnection(
+                host: NWEndpoint.Host(host),
+                port: NWEndpoint.Port(rawValue: port)!,
+                using: .tcp
+            )
+            let queue = DispatchQueue(label: "port-check")
+            var resumed = false
+
+            connection.stateUpdateHandler = { state in
+                guard !resumed else { return }
+                switch state {
+                case .ready:
+                    resumed = true
+                    connection.cancel()
+                    continuation.resume(returning: true)
+                case .failed, .cancelled:
+                    resumed = true
+                    continuation.resume(returning: false)
+                default:
+                    break
+                }
+            }
+
+            connection.start(queue: queue)
+
+            queue.asyncAfter(deadline: .now() + timeout) {
+                guard !resumed else { return }
+                resumed = true
+                connection.cancel()
+                continuation.resume(returning: false)
+            }
+        }
     }
 
     private func getLocalIP() -> String? {
