@@ -1,9 +1,22 @@
 {
-  "fill" : "system-dark",
+  "fill-specializations" : [
+    {
+      "value" : {
+        "automatic-gradient" : "display-p3:0.02637,0.02417,0.02104,1.00000"
+      }
+    },
+    {
+      "appearance" : "dark",
+      "value" : {
+        "automatic-gradient" : "display-p3:0.03965,0.03637,0.03138,1.00000"
+      }
+    }
+  ],
   "groups" : [
     {
       "layers" : [
         {
+          "fill" : "none",
           "glass" : false,
           "hidden" : false,
           "image-name" : "C64U Viewer Icon1.png",
