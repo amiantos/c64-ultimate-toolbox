@@ -39,7 +39,7 @@ final class OpenDeviceWindowController: NSWindowController, NSWindowDelegate {
 
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 420),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 300),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -117,9 +117,24 @@ final class OpenDeviceWindowController: NSWindowController, NSWindowDelegate {
         let container = NSView()
 
         // Help text
-        let helpText = NSTextField(wrappingLabelWithString: "To use Toolbox mode, your Ultimate device needs to be connected to Ethernet, and you need to enable FTP File Service and Web Remote Control Service in the Network Services menu.")
-        helpText.font = .systemFont(ofSize: 11)
-        helpText.textColor = .secondaryLabelColor
+        let helpString = NSMutableAttributedString(
+            string: "To use Toolbox mode, your Ultimate device needs to be connected to Ethernet, and you need to enable FTP File Service and Web Remote Control Service in the Network Services menu. ",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 11),
+                .foregroundColor: NSColor.secondaryLabelColor,
+            ]
+        )
+        helpString.append(NSAttributedString(
+            string: "Learn more.",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 11),
+                .link: URL(string: "https://discuss.bradroot.me/t/c64-ultimate-toolbox-quick-start-guide/80")!,
+            ]
+        ))
+        let helpText = NSTextField(wrappingLabelWithString: "")
+        helpText.attributedStringValue = helpString
+        helpText.isSelectable = true
+        helpText.allowsEditingTextAttributes = true
         helpText.translatesAutoresizingMaskIntoConstraints = false
 
         // Discovered devices header
@@ -215,17 +230,52 @@ final class OpenDeviceWindowController: NSWindowController, NSWindowDelegate {
     private func makeViewerView() -> NSView {
         let container = NSView()
 
+        var views: [NSView] = []
+
+        // Recent sessions at the top
+        if !recentConnections.viewerSessions.isEmpty {
+            let recentLabel = NSTextField(labelWithString: "Recent Sessions:")
+            recentLabel.font = .systemFont(ofSize: 11, weight: .semibold)
+            recentLabel.translatesAutoresizingMaskIntoConstraints = false
+            views.append(recentLabel)
+
+            let recentStack = NSStackView()
+            recentStack.orientation = .vertical
+            recentStack.alignment = .leading
+            recentStack.spacing = 4
+            recentStack.translatesAutoresizingMaskIntoConstraints = false
+
+            for (index, session) in recentConnections.viewerSessions.enumerated() {
+                let button = PillButton(
+                    title: "Video Port: \(session.videoPort) · Audio Port: \(session.audioPort)",
+                    target: self,
+                    action: #selector(connectRecentViewer(_:))
+                )
+                button.tag = index
+                recentStack.addArrangedSubview(button)
+            }
+
+            views.append(recentStack)
+        }
+
+        // Manual listen section
+        let manualLabel = NSTextField(labelWithString: "Manual Listen:")
+        manualLabel.font = .systemFont(ofSize: 11, weight: .semibold)
+        manualLabel.translatesAutoresizingMaskIntoConstraints = false
+
         let videoLabel = NSTextField(labelWithString: "Video Port:")
+        videoLabel.font = .systemFont(ofSize: 11)
+        videoLabel.translatesAutoresizingMaskIntoConstraints = false
         videoPortField.placeholderString = "11000"
         videoPortField.stringValue = "11000"
         videoPortField.translatesAutoresizingMaskIntoConstraints = false
-        videoLabel.translatesAutoresizingMaskIntoConstraints = false
 
         let audioLabel = NSTextField(labelWithString: "Audio Port:")
+        audioLabel.font = .systemFont(ofSize: 11)
+        audioLabel.translatesAutoresizingMaskIntoConstraints = false
         audioPortField.placeholderString = "11001"
         audioPortField.stringValue = "11001"
         audioPortField.translatesAutoresizingMaskIntoConstraints = false
-        audioLabel.translatesAutoresizingMaskIntoConstraints = false
 
         listenButton.translatesAutoresizingMaskIntoConstraints = false
         listenButton.bezelStyle = .rounded
@@ -233,34 +283,59 @@ final class OpenDeviceWindowController: NSWindowController, NSWindowDelegate {
         listenButton.target = self
         listenButton.action = #selector(startListening)
 
-        var views: [NSView] = [
-            videoLabel, videoPortField,
-            audioLabel, audioPortField,
-            listenButton,
-        ]
+        let listenRow = NSStackView(views: [videoLabel, videoPortField, audioLabel, audioPortField, listenButton])
+        listenRow.orientation = .horizontal
+        listenRow.spacing = 6
+        listenRow.translatesAutoresizingMaskIntoConstraints = false
 
-        // Recent connections
-        if !recentConnections.viewerSessions.isEmpty {
-            let recentLabel = NSTextField(labelWithString: "Recent:")
-            recentLabel.font = .systemFont(ofSize: 11, weight: .semibold)
-            recentLabel.translatesAutoresizingMaskIntoConstraints = false
-            views.append(recentLabel)
+        // Labels and button hug content; text fields share remaining space equally
+        videoLabel.setContentHuggingPriority(.required, for: .horizontal)
+        audioLabel.setContentHuggingPriority(.required, for: .horizontal)
+        listenButton.setContentHuggingPriority(.required, for: .horizontal)
+        videoPortField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        audioPortField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        audioPortField.widthAnchor.constraint(equalTo: videoPortField.widthAnchor).isActive = true
 
-            for (index, session) in recentConnections.viewerSessions.enumerated() {
-                let button = NSButton(title: "Video: \(session.videoPort)  Audio: \(session.audioPort)", target: self, action: #selector(connectRecentViewer(_:)))
-                button.bezelStyle = .inline
-                button.controlSize = .small
-                button.tag = index
-                button.translatesAutoresizingMaskIntoConstraints = false
-                views.append(button)
-            }
-        }
+        views.append(manualLabel)
+        views.append(listenRow)
+
+        // Help text
+        let localIP = getLocalIPAddress() ?? "your IP"
+        let helpString = NSMutableAttributedString(
+            string: "To use Viewer mode, you will need to enable the data streams on your Ultimate device and connect it to Ethernet. In the Ultimate Menu, press F1 and go to Streams. Under each stream you'll want to insert your Mac's IP address \(localIP). ",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 11),
+                .foregroundColor: NSColor.secondaryLabelColor,
+            ]
+        )
+        let learnMore = NSAttributedString(
+            string: "Learn more.",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 11),
+                .link: URL(string: "https://discuss.bradroot.me/t/c64-ultimate-toolbox-quick-start-guide/80")!,
+            ]
+        )
+        helpString.append(learnMore)
+
+        let helpText = NSTextField(wrappingLabelWithString: "")
+        helpText.attributedStringValue = helpString
+        helpText.isSelectable = true
+        helpText.allowsEditingTextAttributes = true
+        helpText.translatesAutoresizingMaskIntoConstraints = false
+
+        views.append(helpText)
 
         let stack = NSStackView(views: views)
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 8
         stack.translatesAutoresizingMaskIntoConstraints = false
+
+        // Extra spacing before manual section and help text
+        if let manualIdx = views.firstIndex(where: { $0 === manualLabel }), manualIdx > 0 {
+            stack.setCustomSpacing(16, after: views[manualIdx - 1])
+        }
+        stack.setCustomSpacing(24, after: listenRow)
 
         container.addSubview(stack)
 
@@ -270,8 +345,8 @@ final class OpenDeviceWindowController: NSWindowController, NSWindowDelegate {
             stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 16),
             stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
             trailing,
-            videoPortField.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            audioPortField.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            listenRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            helpText.widthAnchor.constraint(equalTo: stack.widthAnchor),
         ])
 
         return container
